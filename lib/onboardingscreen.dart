@@ -55,7 +55,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             top: -100,
             right: -50,
             child: AnimatedBlob(
-              color: _data[_currentPage].color.withOpacity(0.2),
+              color: _data[_currentPage].color.withValues(alpha: 0.2),
               size: 400,
             ),
           ),
@@ -63,7 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             bottom: -150,
             left: -100,
             child: AnimatedBlob(
-              color: _data[_currentPage].color.withOpacity(0.15),
+              color: _data[_currentPage].color.withValues(alpha: 0.15),
               size: 500,
             ),
           ),
@@ -128,9 +128,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: _data[_currentPage].color.withOpacity(
-                                  0.4,
-                                ),
+                                color: _data[_currentPage].color.withValues(
+                                      alpha: 0.4,
+                                    ),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
@@ -174,7 +174,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       decoration: BoxDecoration(
         color: _currentPage == index
             ? _data[_currentPage].color
-            : Colors.grey.withOpacity(0.3),
+            : Colors.grey.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(4),
       ),
     );
@@ -200,14 +200,14 @@ class OnboardingContent extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: RadialGradient(
                   colors: [
-                    data.color.withOpacity(0.22),
-                    data.color.withOpacity(0.08),
+                    data.color.withValues(alpha: 0.22),
+                    data.color.withValues(alpha: 0.08),
                   ],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: data.color.withOpacity(0.2),
+                    color: data.color.withValues(alpha: 0.2),
                     blurRadius: 24,
                     offset: const Offset(0, 12),
                   ),
@@ -227,8 +227,8 @@ class OnboardingContent extends StatelessWidget {
                             : 430,
                         height:
                             data.imageAsset == 'assets/image/onboarding2.png'
-                            ? 460
-                            : 430,
+                                ? 460
+                                : 430,
                         fit: BoxFit.contain,
                       ),
                     )
@@ -276,9 +276,9 @@ class OnboardingData {
     this.imageAsset,
     required this.color,
   }) : assert(
-         icon != null || imageAsset != null,
-         'Either icon or imageAsset must be provided.',
-       );
+          icon != null || imageAsset != null,
+          'Either icon or imageAsset must be provided.',
+        );
 }
 
 class AnimatedBlob extends StatefulWidget {

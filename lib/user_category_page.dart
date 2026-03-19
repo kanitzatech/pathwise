@@ -69,7 +69,8 @@ class _UserCategoryPageState extends State<UserCategoryPage> {
               Expanded(
                 child: ListView.separated(
                   itemCount: _categories.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final category = _categories[index];
                     final isSelected = _selectedCategoryIndex == index;
@@ -85,15 +86,19 @@ class _UserCategoryPageState extends State<UserCategoryPage> {
                         height: 110,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                          color: isSelected
+                              ? const Color(0xFFEFF6FF)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF3B82F6) : Colors.transparent,
+                            color: isSelected
+                                ? const Color(0xFF3B82F6)
+                                : Colors.transparent,
                             width: 2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(alpha: 0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -105,14 +110,17 @@ class _UserCategoryPageState extends State<UserCategoryPage> {
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? const Color(0xFF3B82F6).withOpacity(0.1) 
+                                color: isSelected
+                                    ? const Color(0xFF3B82F6)
+                                        .withValues(alpha: 0.1)
                                     : const Color(0xFFF3F4F6),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
                                 category.icon,
-                                color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF4B5563),
+                                color: isSelected
+                                    ? const Color(0xFF3B82F6)
+                                    : const Color(0xFF4B5563),
                                 size: 28,
                               ),
                             ),
@@ -165,7 +173,8 @@ class _UserCategoryPageState extends State<UserCategoryPage> {
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF3B82F6),
-                    disabledBackgroundColor: const Color(0xFF3B82F6).withOpacity(0.5),
+                    disabledBackgroundColor:
+                        const Color(0xFF3B82F6).withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

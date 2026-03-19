@@ -9,11 +9,11 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   int _selectedIndex = 0;
-  
-  // Mocking the user category for now. 
+
+  // Mocking the user category for now.
   // In a real app, this would come from a preference or user profile.
   // Categories: '12th', 'college', 'aspirant'
-  final String _userCategory = '12th'; 
+  final String _userCategory = '12th';
 
   @override
   Widget build(BuildContext context) {
@@ -84,10 +84,7 @@ class _HomeState extends State<Home> {
         SizedBox(height: 4),
         Text(
           'Ready to conquer your goals today?',
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF6B7280),
-          ),
+          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
         ),
       ],
     );
@@ -106,7 +103,7 @@ class _HomeState extends State<Home> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: primary.withOpacity(0.3),
+            color: primary.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -161,7 +158,7 @@ class _HomeState extends State<Home> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -193,7 +190,7 @@ class _HomeState extends State<Home> {
           const SizedBox(height: 12),
           LinearProgressIndicator(
             value: 0.6,
-            backgroundColor: Colors.blue.withOpacity(0.1),
+            backgroundColor: Colors.blue.withValues(alpha: 0.1),
             valueColor: AlwaysStoppedAnimation<Color>(primary),
             minHeight: 8,
             borderRadius: BorderRadius.circular(4),
@@ -201,10 +198,7 @@ class _HomeState extends State<Home> {
           const SizedBox(height: 8),
           const Text(
             '3 out of 5 mock tests completed this week',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF6B7280),
-            ),
+            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
           ),
         ],
       ),
@@ -213,10 +207,18 @@ class _HomeState extends State<Home> {
 
   Widget _buildQuickActionsGrid(Color primary) {
     final List<Map<String, dynamic>> actions = [
-      {'title': 'Colleges', 'icon': Icons.school_outlined, 'color': Colors.orange},
+      {
+        'title': 'Colleges',
+        'icon': Icons.school_outlined,
+        'color': Colors.orange,
+      },
       {'title': 'Courses', 'icon': Icons.book_outlined, 'color': Colors.green},
       {'title': 'Tests', 'icon': Icons.edit_document, 'color': Colors.red},
-      {'title': 'Career Paths', 'icon': Icons.trending_up, 'color': Colors.purple},
+      {
+        'title': 'Career Paths',
+        'icon': Icons.trending_up,
+        'color': Colors.purple,
+      },
     ];
 
     return GridView.builder(
@@ -239,7 +241,11 @@ class _HomeState extends State<Home> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(actions[index]['icon'], color: actions[index]['color'], size: 28),
+              Icon(
+                actions[index]['icon'],
+                color: actions[index]['color'],
+                size: 28,
+              ),
               const SizedBox(height: 8),
               Text(
                 actions[index]['title'],
@@ -269,7 +275,10 @@ class _HomeState extends State<Home> {
     } else if (_userCategory == 'college') {
       title = 'Skills & Internships';
       items = [
-        {'title': 'Google Summer of Code', 'subtitle': 'Open Source Opportunity'},
+        {
+          'title': 'Google Summer of Code',
+          'subtitle': 'Open Source Opportunity',
+        },
         {'title': 'Data Science Bootcamp', 'subtitle': 'Trending Skill'},
       ];
     } else {
@@ -322,7 +331,7 @@ class _HomeState extends State<Home> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: secondary.withOpacity(0.1),
+                        color: secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.star, color: secondary, size: 20),
@@ -406,7 +415,9 @@ class _HomeState extends State<Home> {
             ),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: completed ? const Icon(Icons.check, color: Colors.white, size: 16) : null,
+          child: completed
+              ? const Icon(Icons.check, color: Colors.white, size: 16)
+              : null,
         ),
         const SizedBox(width: 12),
         Text(
@@ -428,7 +439,7 @@ class _HomeState extends State<Home> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -450,9 +461,15 @@ class _HomeState extends State<Home> {
         unselectedFontSize: 12,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.auto_stories), label: 'Learn'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.auto_stories),
+            label: 'Learn',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.edit_note), label: 'Tests'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Analysis'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart),
+            label: 'Analysis',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),

@@ -79,7 +79,6 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 20),
                             // Password Field
                             _buildInputField(
-                           
                               hint: 'Enter your password',
                               controller: _passwordController,
                               isPassword: true,
@@ -113,10 +112,12 @@ class _LoginPageState extends State<LoginPage> {
                               height: 56,
                               child: ElevatedButton(
                                 onPressed: () {
-                                  Navigator.pushNamed(context, AppRoutes.userCategory);
+                                  Navigator.pushNamed(
+                                      context, AppRoutes.userCategory);
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Color.fromARGB(255, 94, 194, 237),
+                                  backgroundColor:
+                                      const Color.fromARGB(255, 94, 194, 237),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
@@ -136,15 +137,19 @@ class _LoginPageState extends State<LoginPage> {
                             // Divider
                             Row(
                               children: [
-                                Expanded(child: Divider(color: Colors.grey[300])),
+                                Expanded(
+                                    child: Divider(color: Colors.grey[300])),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
                                   child: Text(
                                     'Or sign in with',
-                                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                    style: TextStyle(
+                                        color: Colors.grey[500], fontSize: 12),
                                   ),
                                 ),
-                                Expanded(child: Divider(color: Colors.grey[300])),
+                                Expanded(
+                                    child: Divider(color: Colors.grey[300])),
                               ],
                             ),
                             const SizedBox(height: 32),
@@ -154,9 +159,12 @@ class _LoginPageState extends State<LoginPage> {
                               children: [
                                 _buildSocialButton(Icons.apple, Colors.black),
                                 const SizedBox(width: 20),
-                                _buildSocialButton(Icons.g_mobiledata_rounded, Colors.red, isGoogle: true),
+                                _buildSocialButton(
+                                    Icons.g_mobiledata_rounded, Colors.red,
+                                    isGoogle: true),
                                 const SizedBox(width: 20),
-                                _buildSocialButton(Icons.facebook, Colors.blue[800]!),
+                                _buildSocialButton(
+                                    Icons.facebook, Colors.blue[800]!),
                               ],
                             ),
                             const SizedBox(height: 48),
@@ -170,7 +178,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 GestureDetector(
                                   onTap: () {
-                                    Navigator.pushNamed(context, AppRoutes.signup);
+                                    Navigator.pushNamed(
+                                        context, AppRoutes.signup);
                                   },
                                   child: const Text(
                                     'Sign Up',
@@ -199,7 +208,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildInputField({
-  
     required String hint,
     required TextEditingController controller,
     bool isPassword = false,
@@ -226,7 +234,8 @@ class _LoginPageState extends State<LoginPage> {
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
             filled: true,
             fillColor: Colors.grey[100],
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -248,7 +257,8 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildSocialButton(IconData icon, Color color, {bool isGoogle = false}) {
+  Widget _buildSocialButton(IconData icon, Color color,
+      {bool isGoogle = false}) {
     return Container(
       width: 50,
       height: 50,

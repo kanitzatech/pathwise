@@ -1,10 +1,12 @@
 name: guidex
-description: "A new Flutter project."
+description: A new Flutter project.
+
 publish_to: 'none'
-version: 0.1.0+1
+
+version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.1
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -13,14 +15,18 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+
+  flutter_lints: ^2.0.0
 
 flutter:
   uses-material-design: true
+
   assets:
-    - assets/image/onboarding1.png
-    - assets/image/onboarding2.png
-    - assets/image/onboarding12.png
-    - assets/image/onboarding3.png
-    - assets/image/idealogo.png
     - assets/image/category.png
+    - assets/image/idealogo.png
+    - assets/image/onboarding1.png
+    - assets/image/onboarding12.png
+    - assets/image/onboarding2.png
+    - assets/image/onboarding3.png
+    - assets/images/idea.jpeg
+    - assets/images/idea1.png
