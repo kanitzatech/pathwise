@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:guidex/app_routes.dart';
-import 'package:guidex/home.dart';
 import 'package:guidex/onboardingscreen.dart';
 import 'package:guidex/splashscreen.dart';
 import 'package:guidex/login_page.dart';
 import 'package:guidex/signup_page.dart';
 import 'package:guidex/user_category_page.dart';
-import 'package:guidex/screens/recommendation_screen.dart';
+import 'package:guidex/home.dart';
+import 'package:guidex/screens/analysis_test_page.dart';
+import 'package:guidex/screens/analysis_results_page.dart';
+import 'package:guidex/models/recommendation.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,7 +33,28 @@ class MyApp extends StatelessWidget {
         AppRoutes.login: (context) => const LoginPage(),
         AppRoutes.signup: (context) => const SignUpPage(),
         AppRoutes.userCategory: (context) => const UserCategoryPage(),
-        AppRoutes.home: (context) => const RecommendationScreen(),
+        AppRoutes.home: (context) => const Home(),
+        AppRoutes.analysisTest: (context) => const AnalysisTestPage(),
+        AppRoutes.analysisResults: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments
+              as Map<String, dynamic>?;
+
+          return AnalysisResultsPage(
+            name: args?['name'] as String?,
+            cutoff: (args?['cutoff'] as num?)?.toDouble(),
+            category: args?['category'] as String?,
+            selectedCourses: (args?['selectedCourses'] as List?)
+                ?.map((e) => e.toString())
+                .toList(),
+            interest: args?['interest'] as String?,
+            district: args?['district'] as String?,
+            prefetchedRecommendations:
+                (args?['prefetchedRecommendations'] as List?)
+                    ?.whereType<Recommendation>()
+                    .toList(),
+            prefetchError: args?['prefetchError'] as String?,
+          );
+        },
       },
     );
   }

@@ -31,6 +31,11 @@ public class RecommendationController {
         return ResponseEntity.ok(recommendationService.getAllDistricts());
     }
 
+    @GetMapping("/courses")
+    public ResponseEntity<List<String>> getCourses() {
+        return ResponseEntity.ok(recommendationService.getAllCourses());
+    }
+
     @GetMapping("/recommend")
     public ResponseEntity<Map<String, Object>> recommend(
             @RequestParam String category,

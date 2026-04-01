@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:guidex/app_routes.dart';
+import 'package:guidex/services/api_service.dart';
+import 'package:guidex/models/recommendation.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -8,12 +11,36 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
+  final ApiService _apiService = ApiService();
   int _selectedIndex = 0;
+  List<Recommendation> _recommendedColleges = [];
+  bool _isRecommendationsLoading = true;
 
   // Mocking the user category for now.
   // In a real app, this would come from a preference or user profile.
   // Categories: '12th', 'college', 'aspirant'
   final String _userCategory = '12th';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecommendations();
+  }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      // Mocking cutoff and interest for the dashboard preview
+      final results = await _apiService.getRecommendations(
+          category: 'OC', cutoff: 185.0, interest: 'Software');
+      setState(() {
+        _recommendedColleges = results;
+        _isRecommendationsLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isRecommendationsLoading = false);
+      debugPrint('Error loading dashboard recommendations: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,30 +259,42 @@ class _HomeState extends State<Home> {
         childAspectRatio: 1.5,
       ),
       itemBuilder: (context, index) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                actions[index]['icon'],
-                color: actions[index]['color'],
-                size: 28,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                actions[index]['title'],
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: Color(0xFF374151),
+        return GestureDetector(
+          onTap: () {
+            if (index == 0) {
+              Navigator.pushNamed(context, AppRoutes.analysisTest);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text('${actions[index]['title']} coming soon!')),
+              );
+            }
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  actions[index]['icon'],
+                  color: actions[index]['color'],
+                  size: 28,
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  actions[index]['title'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: Color(0xFF374151),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -268,10 +307,22 @@ class _HomeState extends State<Home> {
 
     if (_userCategory == '12th') {
       title = 'Colleges for You';
-      items = [
-        {'title': 'IIT Madras', 'subtitle': 'Top Engineering Research'},
-        {'title': 'BITS Pilani', 'subtitle': 'Excellence in Technology'},
-      ];
+      if (_isRecommendationsLoading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      if (_recommendedColleges.isEmpty) {
+        items = [
+          {'title': 'IIT Madras', 'subtitle': 'Top Engineering Research'},
+          {'title': 'BITS Pilani', 'subtitle': 'Excellence in Technology'},
+        ];
+      } else {
+        items = _recommendedColleges.take(5).map<Map<String, String>>((e) {
+          return {
+            'title': e.collegeName,
+            'subtitle': e.courseName,
+          };
+        }).toList();
+      }
     } else if (_userCategory == 'college') {
       title = 'Skills & Internships';
       items = [

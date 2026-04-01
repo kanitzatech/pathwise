@@ -166,10 +166,9 @@ class _UserCategoryPageState extends State<UserCategoryPage> {
                       ? () {
                           if (_selectedCategoryIndex == 0) {
                             // "After 12th" specific route path
-                            Navigator.pushNamedAndRemoveUntil(
+                            Navigator.pushNamed(
                               context,
-                              AppRoutes.home,
-                              (route) => false,
+                              AppRoutes.analysisTest,
                             );
                           } else {
                             // Other sections

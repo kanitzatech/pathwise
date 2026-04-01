@@ -22,27 +22,28 @@ public interface CutoffHistoryRepository extends JpaRepository<CutoffHistory, In
      *
      * Results are eagerly joined with College and Course to avoid N+1 and sorted automatically via DB.
      */
-    @Query(value = "SELECT ch FROM CutoffHistory ch " +
-           "JOIN FETCH ch.college c " +
-           "JOIN FETCH ch.course cr " +
-           "WHERE LOWER(ch.category) = LOWER(:category) " +
-           "AND ch.closingCutoff <= :normalizedCutoff " +
-           "AND ch.closingCutoff >= :lowerBound " +
-           "AND LOWER(cr.courseName) IN :courseNames " +
-           "AND (COALESCE(:district, '') = '' OR LOWER(c.district) = LOWER(:district))",
-           countQuery = "SELECT COUNT(ch) FROM CutoffHistory ch " +
-           "JOIN ch.college c " +
-           "JOIN ch.course cr " +
-           "WHERE LOWER(ch.category) = LOWER(:category) " +
-           "AND ch.closingCutoff <= :normalizedCutoff " +
-           "AND ch.closingCutoff >= :lowerBound " +
-           "AND LOWER(cr.courseName) IN :courseNames " +
-           "AND (COALESCE(:district, '') = '' OR LOWER(c.district) = LOWER(:district))")
+    @Query(value = "SELECT ch.* FROM cutoff_history ch " +
+           "JOIN colleges c ON ch.college_id = c.college_id " +
+           "JOIN courses cr ON ch.course_id = cr.course_id " +
+           "WHERE (LOWER(ch.category) = LOWER(:category)) " +
+           "AND (ch.closing_cutoff <= :normalizedCutoff) " +
+           "AND (ch.closing_cutoff >= :lowerBound) " +
+           "AND (cr.course_name ILIKE ANY (CAST(:courseNames AS text[]))) " +
+           "AND (:district IS NULL OR :district = '' OR c.district ILIKE '%' || :district || '%')",
+           countQuery = "SELECT COUNT(*) FROM cutoff_history ch " +
+           "JOIN colleges c ON ch.college_id = c.college_id " +
+           "JOIN courses cr ON ch.course_id = cr.course_id " +
+           "WHERE (LOWER(ch.category) = LOWER(:category)) " +
+           "AND (ch.closing_cutoff <= :normalizedCutoff) " +
+           "AND (ch.closing_cutoff >= :lowerBound) " +
+           "AND (cr.course_name ILIKE ANY (CAST(:courseNames AS text[]))) " +
+           "AND (:district IS NULL OR :district = '' OR c.district ILIKE '%' || :district || '%')",
+           nativeQuery = true)
     Page<CutoffHistory> findRecommendations(
             @Param("category") String category,
             @Param("normalizedCutoff") Double normalizedCutoff,
             @Param("lowerBound") Double lowerBound,
-            @Param("courseNames") List<String> courseNames,
+            @Param("courseNames") String[] courseNames,
             @Param("district") String district,
             Pageable pageable
     );

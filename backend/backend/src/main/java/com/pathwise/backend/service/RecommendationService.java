@@ -3,6 +3,7 @@ package com.pathwise.backend.service;
 import com.pathwise.backend.dto.RecommendationResponse;
 import com.pathwise.backend.model.CutoffHistory;
 import com.pathwise.backend.repository.CollegeRepository;
+import com.pathwise.backend.repository.CourseRepository;
 import com.pathwise.backend.repository.CutoffHistoryRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,20 +11,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Arrays;
 
 @Service
 public class RecommendationService {
 
     private final CutoffHistoryRepository cutoffHistoryRepository;
     private final CollegeRepository collegeRepository;
+    private final CourseRepository courseRepository;
 
     /**
      * Maps a student's broad interest area to specific course-name keywords.
@@ -33,24 +31,30 @@ public class RecommendationService {
 
     static {
         Map<String, List<String>> map = new LinkedHashMap<>();
-        map.put("software",    List.of("cse", "it", "computer science and engineering",
-                                       "information technology"));
-        map.put("electronics", List.of("ece", "eee", "electronics and communication engineering",
-                                       "electrical and electronics engineering"));
-        map.put("mechanical",  List.of("me", "mechanical engineering"));
-        map.put("civil",       List.of("ce", "civil engineering"));
-        map.put("biomedical",  List.of("bme", "biomedical engineering"));
+        map.put("software",    List.of("cse", "computer science", "computer science engineering", "it", "information technology"));
+        map.put("electronics", List.of("ece", "eee", "electronics", "electrical"));
+        map.put("mechanical",  List.of("me"));
         INTEREST_COURSE_MAP = Collections.unmodifiableMap(map);
     }
 
-    public RecommendationService(CutoffHistoryRepository cutoffHistoryRepository, CollegeRepository collegeRepository) {
+    public RecommendationService(
+            CutoffHistoryRepository cutoffHistoryRepository,
+            CollegeRepository collegeRepository,
+            CourseRepository courseRepository
+    ) {
         this.cutoffHistoryRepository = cutoffHistoryRepository;
         this.collegeRepository = collegeRepository;
+        this.courseRepository = courseRepository;
     }
 
     @Transactional(readOnly = true)
     public List<String> getAllDistricts() {
         return collegeRepository.findDistinctDistricts();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getAllCourses() {
+        return courseRepository.findDistinctCourseNames();
     }
 
     /**
@@ -63,37 +67,49 @@ public class RecommendationService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getRecommendations(String category, Double cutoff, String interest, String district, String sortBy, int page, int size) {
+        
+        // Task 1: Use raw cutoff input (No division by 2.0 as DB follows 200-scale)
+        Double normalizedCutoff = cutoff; 
+        
+        // Task 2: Apply filter (lowerBound: current cutoff - 20 avoid too many low-tier results)
+        Double lowerBound = normalizedCutoff - 20.0; 
 
-        List<String> courseNames = resolveCourseNames(interest);
+        List<String> rawCourseNames = resolveCourseNames(interest);
+        
+        // Format for native SQL 'ILIKE ANY': wrap in wildcards %term%
+        String[] courseNamesArray = rawCourseNames.stream()
+                .map(n -> "%" + n + "%")
+                .toArray(String[]::new);
 
-        if (courseNames.isEmpty()) {
+        // Task 5 & 6: Add debug logs
+        System.out.println("--- DEBUG RECOMMENDATION ---");
+        System.out.println("category: " + category);
+        System.out.println("normalizedCutoff: " + normalizedCutoff);
+        System.out.println("lowerBound: " + lowerBound);
+        System.out.println("courseNames: " + Arrays.toString(courseNamesArray));
+
+        if (rawCourseNames.isEmpty()) {
+            System.out.println("DEBUG: No courses found for interest: " + interest);
             return Map.of("results", Collections.emptyList(), "totalElements", 0, "currentPage", page);
         }
 
-        Double normalizedCutoff = cutoff / 2.0;
-        Double lowerBound = Math.max(0.0, normalizedCutoff - 30.0);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "cutoff_id"));
 
-        // Sorting
-        Sort sort;
-        if ("highest_cutoff".equalsIgnoreCase(sortBy)) {
-            sort = Sort.by(Sort.Direction.DESC, "closingCutoff");
-        } else {
-            // Default best_match mapped safely natively if purely SQL paginated
-            sort = Sort.by(Sort.Direction.DESC, "closingCutoff");
-        }
-
-        Pageable pageable = PageRequest.of(page, size, sort);
-
+        // Task 4: Re-enable district filter
         Page<CutoffHistory> pagedRecords = cutoffHistoryRepository
-                .findRecommendations(category, normalizedCutoff, lowerBound, courseNames, district, pageable);
+                .findRecommendations(category, normalizedCutoff, lowerBound, courseNamesArray, district, pageable);
+
+        System.out.println("DEBUG: Found records count: " + pagedRecords.getTotalElements());
 
         List<RecommendationResponse> results = pagedRecords.stream()
                 .map(ch -> {
                     String type;
                     double cOff = ch.getClosingCutoff();
-                    if (cOff >= normalizedCutoff) {
+                    double diff = normalizedCutoff - cOff;
+
+                    if (diff <= 2) {
                         type = "DREAM";
-                    } else if (cOff >= normalizedCutoff - 5) {
+                    } else if (diff <= 6) {
                         type = "TARGET";
                     } else {
                         type = "SAFE";
@@ -172,6 +188,11 @@ public class RecommendationService {
             return Collections.emptyList();
         }
         List<String> mapped = INTEREST_COURSE_MAP.get(interest.trim().toLowerCase());
-        return mapped != null ? mapped : Collections.emptyList();
+        if (mapped != null && !mapped.isEmpty()) {
+            return mapped;
+        }
+
+        // If no broad mapping exists, treat user input as a direct course name filter.
+        return List.of(interest.trim().toLowerCase());
     }
 }
