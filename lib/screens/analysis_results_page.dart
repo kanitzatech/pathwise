@@ -59,6 +59,10 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
     return const <String>['Software'];
   }
 
+  String get _displayLocation => (widget.district?.trim().isNotEmpty ?? false)
+      ? widget.district!.trim()
+      : 'Any';
+
   @override
   void initState() {
     super.initState();
@@ -396,21 +400,49 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'COURSES',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade500,
-                          letterSpacing: 1),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _displayCourses
-                          .map((course) => _buildChip(course))
-                          .toList(),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'COURSES',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey.shade500,
+                                    letterSpacing: 1),
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: _displayCourses
+                                    .map((course) => _buildChip(course))
+                                    .toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'LOCATION',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade500,
+                                  letterSpacing: 1),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildChip(_displayLocation),
+                          ],
+                        ),
+                      ],
                     ),
                   ],
                 ),

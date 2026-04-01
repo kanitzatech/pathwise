@@ -35,7 +35,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
 
   // Screen 3 Data
   final List<String> _selectedCourses = [];
-  final TextEditingController _collegeCountController = TextEditingController();
+  final List<String> _selectedColleges = [];
 
   final List<String> _fallbackCourses = [
     'Computer Science Engineering',
@@ -45,6 +45,20 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     'Mechanical Engineering',
     'Civil Engineering',
     'Biomedical Engineering',
+  ];
+  final List<String> _collegeOptions = [
+    'Anna University - CEG Campus',
+    'PSG College of Technology',
+    'SSN College of Engineering',
+    'Sri Sivasubramaniya Nadar College',
+    'Thiagarajar College of Engineering',
+    'Coimbatore Institute of Technology',
+    'Government College of Technology, Coimbatore',
+    'Kumaraguru College of Technology',
+    'Velammal Engineering College',
+    'Rajalakshmi Engineering College',
+    'SRM Institute of Science and Technology',
+    'VIT Chennai',
   ];
   List<String> _courseOptions = [];
   bool _coursesLoading = false;
@@ -104,7 +118,6 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     _physicsController.dispose();
     _chemistryController.dispose();
     _mathsController.dispose();
-    _collegeCountController.dispose();
     super.dispose();
   }
 
@@ -230,6 +243,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
       'category': _selectedCategory,
       'cutoff': _cutoff,
       'selectedCourses': selectedCoursesForResults,
+      'selectedColleges': List<String>.from(_selectedColleges),
       'interest': _selectedInterest,
       'district': _selectedDistrict == 'Any' ? null : _selectedDistrict,
       'prefetchedRecommendations': prefetchedRecommendations,
@@ -539,9 +553,26 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
             onChanged: (val) => setState(() => _selectedDistrict = val),
           ),
           const SizedBox(height: 32),
-          _buildTextField("College Preference",
-              "Preferred number of recommendations", _collegeCountController,
-              isNumber: true),
+          const Text(
+            "College Preference",
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151)),
+          ),
+          const SizedBox(height: 12),
+          _MultiSelectDropdown(
+            label: 'Colleges',
+            options: _collegeOptions,
+            selectedItems: _selectedColleges,
+            onChanged: (selected) {
+              setState(() {
+                _selectedColleges
+                  ..clear()
+                  ..addAll(selected);
+              });
+            },
+          ),
         ],
       ),
     );
