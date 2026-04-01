@@ -99,6 +99,7 @@ class _AnalysisResultsPageState extends State<AnalysisResultsPage> {
         cutoff: recommendationCutoff,
         interest: interest,
         district: district,
+        size: 12,
       );
 
       if (!mounted) {

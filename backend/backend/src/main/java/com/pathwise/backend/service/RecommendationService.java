@@ -1,20 +1,18 @@
 package com.pathwise.backend.service;
 
 import com.pathwise.backend.dto.RecommendationResponse;
-import com.pathwise.backend.model.CutoffHistory;
 import com.pathwise.backend.repository.CollegeRepository;
 import com.pathwise.backend.repository.CourseRepository;
 import com.pathwise.backend.repository.CutoffHistoryRepository;
+import com.pathwise.backend.repository.projection.RecommendationRow;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.Arrays;
 
 @Service
 public class RecommendationService {
@@ -67,44 +65,45 @@ public class RecommendationService {
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getRecommendations(String category, Double cutoff, String interest, String district, String sortBy, int page, int size) {
-        
-        // Task 1: Use raw cutoff input (No division by 2.0 as DB follows 200-scale)
-        Double normalizedCutoff = cutoff; 
-        
-        // Task 2: Apply filter (lowerBound: current cutoff - 20 avoid too many low-tier results)
-        Double lowerBound = normalizedCutoff - 20.0; 
+        Double normalizedCutoff = cutoff;
+        Double lowerBound = normalizedCutoff - 20.0;
 
         List<String> rawCourseNames = resolveCourseNames(interest);
-        
-        // Format for native SQL 'ILIKE ANY': wrap in wildcards %term%
+
         String[] courseNamesArray = rawCourseNames.stream()
                 .map(n -> "%" + n + "%")
                 .toArray(String[]::new);
 
-        // Task 5 & 6: Add debug logs
-        System.out.println("--- DEBUG RECOMMENDATION ---");
-        System.out.println("category: " + category);
-        System.out.println("normalizedCutoff: " + normalizedCutoff);
-        System.out.println("lowerBound: " + lowerBound);
-        System.out.println("courseNames: " + Arrays.toString(courseNamesArray));
-
         if (rawCourseNames.isEmpty()) {
-            System.out.println("DEBUG: No courses found for interest: " + interest);
             return Map.of("results", Collections.emptyList(), "totalElements", 0, "currentPage", page);
         }
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "cutoff_id"));
+        Pageable pageable = PageRequest.of(page, size);
 
-        // Task 4: Re-enable district filter
-        Page<CutoffHistory> pagedRecords = cutoffHistoryRepository
-                .findRecommendations(category, normalizedCutoff, lowerBound, courseNamesArray, district, pageable);
+        final Page<RecommendationRow> pagedRows;
+        if (district == null || district.isBlank()) {
+            pagedRows = cutoffHistoryRepository.findRecommendationsAllDistricts(
+                category,
+                normalizedCutoff,
+                lowerBound,
+                courseNamesArray,
+                pageable
+            );
+        } else {
+            pagedRows = cutoffHistoryRepository.findRecommendationsByDistrict(
+                category,
+                normalizedCutoff,
+                lowerBound,
+                courseNamesArray,
+                district,
+                pageable
+            );
+        }
 
-        System.out.println("DEBUG: Found records count: " + pagedRecords.getTotalElements());
-
-        List<RecommendationResponse> results = pagedRecords.stream()
-                .map(ch -> {
-                    String type;
-                    double cOff = ch.getClosingCutoff();
+        List<RecommendationResponse> results = pagedRows.stream()
+            .map(row -> {
+                String type;
+                double cOff = row.getClosingCutoff() == null ? 0.0 : row.getClosingCutoff();
                     double diff = normalizedCutoff - cOff;
 
                     if (diff <= 2) {
@@ -116,10 +115,10 @@ public class RecommendationService {
                     }
 
                     return RecommendationResponse.builder()
-                            .collegeName(ch.getCollege().getCollegeName())
-                            .courseName(mapToFullName(ch.getCourse().getCourseName()))
-                            .district(ch.getCollege().getDistrict())
-                            .collegeType(ch.getCollege().getCollegeType())
+                            .collegeName(row.getCollegeName())
+                            .courseName(mapToFullName(row.getCourseName()))
+                            .district(row.getDistrict())
+                            .collegeType(row.getCollegeType())
                             .cutoff(cOff)
                             .score(cOff)
                             .recommendationType(type)
@@ -138,8 +137,8 @@ public class RecommendationService {
 
         Map<String, Object> response = new HashMap<>();
         response.put("results", results);
-        response.put("totalElements", pagedRecords.getTotalElements());
-        response.put("currentPage", pagedRecords.getNumber());
+        response.put("totalElements", pagedRows.getTotalElements());
+        response.put("currentPage", pagedRows.getNumber());
 
         return response;
     }

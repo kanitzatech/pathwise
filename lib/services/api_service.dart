@@ -16,6 +16,13 @@ class ApiService {
   static const bool _androidEmulator =
       bool.fromEnvironment('ANDROID_EMULATOR', defaultValue: true);
   static const Duration _requestTimeout = Duration(seconds: 12);
+  static const Duration _metadataCacheTtl = Duration(minutes: 30);
+  static const Duration _recommendationCacheTtl = Duration(minutes: 3);
+  static final Map<String, _CachedRecommendations> _recommendationCache = {};
+  static List<String>? _districtCache;
+  static DateTime? _districtCacheAt;
+  static List<String>? _courseCache;
+  static DateTime? _courseCacheAt;
 
   String _normalizeBaseUrl(String rawBaseUrl) {
     final trimmed = rawBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
@@ -61,6 +68,12 @@ class ApiService {
   }
 
   Future<List<String>> getDistricts() async {
+    if (_districtCache != null &&
+        _districtCacheAt != null &&
+        DateTime.now().difference(_districtCacheAt!) <= _metadataCacheTtl) {
+      return _districtCache!;
+    }
+
     final candidateBases = _districtBaseCandidates();
     for (final candidateBase in candidateBases) {
       final uri = _buildUriFromBase(candidateBase, '/districts');
@@ -75,6 +88,8 @@ class ApiService {
         final List<dynamic> decoded = json.decode(response.body);
         final districts = decoded.map((e) => e.toString()).toList();
         if (districts.isNotEmpty) {
+          _districtCache = List<String>.unmodifiable(districts);
+          _districtCacheAt = DateTime.now();
           return districts;
         }
 
@@ -88,6 +103,12 @@ class ApiService {
   }
 
   Future<List<String>> getCourses() async {
+    if (_courseCache != null &&
+        _courseCacheAt != null &&
+        DateTime.now().difference(_courseCacheAt!) <= _metadataCacheTtl) {
+      return _courseCache!;
+    }
+
     final candidateBases = _districtBaseCandidates();
     for (final candidateBase in candidateBases) {
       final uri = _buildUriFromBase(candidateBase, '/courses');
@@ -108,6 +129,8 @@ class ApiService {
           ..sort();
 
         if (courses.isNotEmpty) {
+          _courseCache = List<String>.unmodifiable(courses);
+          _courseCacheAt = DateTime.now();
           return courses;
         }
 
@@ -141,6 +164,21 @@ class ApiService {
       queryParams['district'] = district;
     }
 
+    final cacheKey = [
+      category.trim().toLowerCase(),
+      cutoff.toStringAsFixed(2),
+      interest.trim().toLowerCase(),
+      (district ?? '').trim().toLowerCase(),
+      sortBy.trim().toLowerCase(),
+      page,
+      size,
+    ].join('|');
+
+    final cached = _recommendationCache[cacheKey];
+    if (cached != null && !cached.isExpired(_recommendationCacheTtl)) {
+      return cached.items;
+    }
+
     final uri = _buildUri('/recommend', queryParameters: queryParams);
 
     try {
@@ -150,11 +188,18 @@ class ApiService {
         final decoded = json.decode(response.body);
         final resultsRaw = _extractRecommendationArray(decoded);
 
-        return resultsRaw
+        final items = resultsRaw
             .whereType<Map>()
             .map((entry) =>
                 Recommendation.fromJson(Map<String, dynamic>.from(entry)))
             .toList();
+
+        _recommendationCache[cacheKey] = _CachedRecommendations(
+          items: List<Recommendation>.unmodifiable(items),
+          createdAt: DateTime.now(),
+        );
+
+        return items;
       } else {
         throw Exception(
             'Failed to load recommendations: ${response.statusCode}');
@@ -291,4 +336,16 @@ class ApiService {
 
     return const [];
   }
+}
+
+class _CachedRecommendations {
+  final List<Recommendation> items;
+  final DateTime createdAt;
+
+  const _CachedRecommendations({
+    required this.items,
+    required this.createdAt,
+  });
+
+  bool isExpired(Duration ttl) => DateTime.now().difference(createdAt) > ttl;
 }
