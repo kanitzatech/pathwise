@@ -1,29 +1,21 @@
 class Recommendation {
   final String collegeName;
   final String courseName;
-  final String district;
-  final String collegeType;
   final double cutoff;
   final double score;
-  final String recommendationType;
+  final String? district;
+  final String? collegeType;
 
   Recommendation({
     required this.collegeName,
     required this.courseName,
-    required this.district,
-    required this.collegeType,
     required this.cutoff,
     required this.score,
-    required this.recommendationType,
+    this.district,
+    this.collegeType,
   });
 
   factory Recommendation.fromJson(Map<String, dynamic> json) {
-    final type = _readString(
-      json,
-      const ['recommendation_type', 'recommendationType', 'type'],
-      fallback: 'SAFE',
-    ).toUpperCase();
-
     return Recommendation(
       collegeName: _readString(
         json,
@@ -35,18 +27,23 @@ class Recommendation {
         const ['course_name', 'courseName', 'course', 'branch'],
         fallback: 'Unknown Course',
       ),
-      district: _readString(json, const ['district', 'location'],
-          fallback: 'Unknown District'),
-      collegeType: _readString(
+      district: _readOptionalString(json, const ['district', 'location']),
+      collegeType: _readOptionalString(
         json,
         const ['college_type', 'collegeType', 'type_name'],
-        fallback: 'Unknown Type',
       ),
       cutoff: _readDouble(
-          json, const ['cutoff', 'closing_cutoff', 'closingCutoff']),
+          json, const ['cutoff', 'closing_cutoff', 'closingCutoff', 'oc_min']),
       score: _readDouble(json, const ['score', 'match_score', 'matchScore']),
-      recommendationType: type.isEmpty ? 'SAFE' : type,
     );
+  }
+
+  static String? _readOptionalString(
+    Map<String, dynamic> source,
+    List<String> keys,
+  ) {
+    final value = _readString(source, keys, fallback: '');
+    return value.isEmpty ? null : value;
   }
 
   static String _readString(

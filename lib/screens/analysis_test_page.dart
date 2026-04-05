@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:guidex/app_routes.dart';
+import 'package:guidex/models/recommendation.dart';
 import 'package:guidex/services/api_service.dart';
 
 class AnalysisTestPage extends StatefulWidget {
@@ -26,10 +27,18 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
   final TextEditingController _chemistryController = TextEditingController();
   final TextEditingController _mathsController = TextEditingController();
   double _cutoff = 0.0;
-  final List<String> _categories = ['OC', 'BC', 'MBC', 'SC', 'ST'];
+  final List<String> _categories = [
+    'OC',
+    'BC',
+    'BCM',
+    'MBC',
+    'SC',
+    'SCA',
+    'ST'
+  ];
 
   // Final Selection Data
-  String? _selectedDistrict = 'Chennai';
+  String _selectedDistrict = 'Any';
   String _selectedInterest = 'Computer Science Engineering';
 
   final List<String> _fallbackCourses = [
@@ -42,8 +51,11 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     'Biomedical Engineering',
   ];
   List<String> _courseOptions = [];
+  Map<String, String> _courseDisplayToQuery = {};
   bool _coursesLoading = false;
-  final List<String> _districts = [
+  bool _districtsLoading = false;
+  List<String> _districtOptions = const ['Any'];
+  static const List<String> _fallbackDistricts = [
     'Any',
     'Ariyalur',
     'Chengalpattu',
@@ -80,6 +92,113 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     'Virudhunagar',
   ];
 
+  static const Map<String, String> _courseCodeToFullName = {
+    'CS': 'Computer Science Engineering',
+    'EC': 'Electronics and Communication Engineering',
+    'EE': 'Electrical and Electronics Engineering',
+    'EI': 'Electronics and Instrumentation Engineering',
+    'CE': 'Civil Engineering',
+    'CI': 'Civil Engineering',
+    'CL': 'Civil Engineering',
+    'AD': 'Artificial Intelligence and Data Science',
+    'AM': 'Artificial Intelligence and Machine Learning',
+    'CB': 'Computer Science and Business Systems',
+    'CD': 'Computer Science and Design',
+    'CG': 'Computer Science and Engineering (AI and ML)',
+    'CO': 'Computer Science and Engineering (IoT)',
+    'CN': 'Computer Science and Engineering (Networks)',
+    'CR': 'Computer Science and Engineering (Cyber Security)',
+    'CW': 'Computer Science and Engineering (Data Science)',
+    'CY': 'Cyber Security',
+    'CZ': 'Computer Science and Engineering (Specialization)',
+    'SC': 'Computer Science and Engineering (Cyber Security)',
+    'AE': 'Aeronautical Engineering',
+    'AGE': 'Agricultural Engineering',
+    'AG': 'Agricultural Engineering',
+    'AI&DS': 'Artificial Intelligence and Data Science',
+    'APT': 'Apparel Technology',
+    'ARCH': 'Architecture',
+    'ASE': 'Aerospace Engineering',
+    'AU': 'Automobile Engineering',
+    'BME': 'Biomedical Engineering',
+    'BT': 'Biotechnology',
+    'CCE': 'Computer and Communication Engineering',
+    'CECE': 'Civil and Environmental Engineering',
+    'CHE': 'Chemical Engineering',
+    'CIVIL': 'Civil Engineering',
+    'CRT': 'Ceramic Technology',
+    'CSBS': 'Computer Science and Business Systems',
+    'CSE': 'Computer Science Engineering',
+    'CSE (AI&ML)': 'Computer Science Engineering (AI and ML)',
+    'CSE (BDA)': 'Computer Science Engineering (Big Data Analytics)',
+    'CSE (IOT&CS)': 'Computer Science Engineering (IoT and Cyber Security)',
+    'CST': 'Computer Science and Technology',
+    'CT': 'Chemical Technology',
+    'CYS': 'Cyber Security',
+    'ECE': 'Electronics and Communication Engineering',
+    'EEE': 'Electrical and Electronics Engineering',
+    'EIE': 'Electronics and Instrumentation Engineering',
+    'ENVE': 'Environmental Engineering',
+    'ETE': 'Electronics and Telecommunication Engineering',
+    'FASHT': 'Fashion Technology',
+    'FT': 'Food Technology',
+    'GI': 'Geo Informatics',
+    'HTT': 'Handloom and Textile Technology',
+    'IBT': 'Industrial Biotechnology',
+    'ICE': 'Instrumentation and Control Engineering',
+    'IE': 'Industrial Engineering',
+    'IEM': 'Industrial Engineering and Management',
+    'ISE': 'Information Science and Engineering',
+    'IT': 'Information Technology',
+    'LE': 'Leather Technology',
+    'MAE': 'Mechanical and Automation Engineering',
+    'MCT': 'Mechatronics Engineering',
+    'MDE': 'Manufacturing Design Engineering',
+    'ME': 'Mechanical Engineering',
+    'ME (MFG)': 'Mechanical Engineering (Manufacturing)',
+    'MFGE': 'Manufacturing Engineering',
+    'MI': 'Mining Engineering',
+    'MME': 'Metallurgical and Materials Engineering',
+    'MRE': 'Mechatronics and Robotics Engineering',
+    'MSE': 'Materials Science and Engineering',
+    'MT': 'Marine Technology',
+    'PCT': 'Petrochemical Technology',
+    'PE': 'Production Engineering',
+    'PET': 'Petroleum Engineering and Technology',
+    'PETRO': 'Petrochemical Engineering',
+    'PETROCHEMICAL E': 'Petrochemical Engineering',
+    'PHARMT': 'Pharmaceutical Technology',
+    'PH': 'Pharmaceutical Technology',
+    'PT': 'Polymer Technology',
+    'PP': 'Polymer and Plastics Technology',
+    'RA': 'Robotics and Automation',
+    'RM': 'Robotics and Automation',
+    'RPT': 'Rubber and Plastics Technology',
+    'RP': 'Rubber and Plastics Technology',
+    'TC': 'Textile Chemistry',
+    'TX': 'Textile Technology',
+    'TT': 'Textile Technology',
+  };
+
+  String _toFullCourseName(String rawCourse) {
+    final trimmed = rawCourse.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final key = trimmed.toUpperCase();
+    final mapped = _courseCodeToFullName[key];
+    if (mapped != null) {
+      return mapped;
+    }
+
+    if (trimmed.length <= 3 && !trimmed.contains(' ')) {
+      return 'Specialization ($trimmed)';
+    }
+
+    return trimmed;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +206,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     _chemistryController.addListener(_calculateCutoff);
     _mathsController.addListener(_calculateCutoff);
     _loadCourses();
+    _loadDistricts();
   }
 
   @override
@@ -119,8 +239,28 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     if (!mounted) return;
 
     final resolved = courses.isEmpty ? _fallbackCourses : courses;
+    final displayToQuery = <String, String>{};
+
+    for (final rawCourse in resolved) {
+      final display = _toFullCourseName(rawCourse);
+      if (display.isEmpty) {
+        continue;
+      }
+      displayToQuery.putIfAbsent(display, () => rawCourse.trim());
+    }
+
+    if (displayToQuery.isEmpty) {
+      for (final fallback in _fallbackCourses) {
+        displayToQuery[fallback] = fallback;
+      }
+    }
+
+    final displayOptions = displayToQuery.keys.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
     setState(() {
-      _courseOptions = resolved;
+      _courseDisplayToQuery = displayToQuery;
+      _courseOptions = displayOptions;
       _coursesLoading = false;
       if (!_courseOptions.contains(_selectedInterest) &&
           _courseOptions.isNotEmpty) {
@@ -129,8 +269,97 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     });
   }
 
+  Future<void> _loadAvailableCoursesForCurrentInputs() async {
+    if (_selectedCategory.isEmpty || _cutoff <= 0) {
+      return;
+    }
+
+    setState(() {
+      _coursesLoading = true;
+    });
+
+    final available = await _apiService.getAvailableCourses(
+      category: _selectedCategory,
+      cutoff: _cutoff,
+    );
+    if (!mounted) return;
+
+    if (available.isEmpty) {
+      setState(() {
+        _coursesLoading = false;
+      });
+      return;
+    }
+
+    final displayToQuery = <String, String>{};
+    for (final value in available) {
+      final raw = value.trim();
+      if (raw.isEmpty) {
+        continue;
+      }
+
+      final display = _toFullCourseName(raw);
+      if (display.isEmpty) {
+        continue;
+      }
+
+      displayToQuery.putIfAbsent(display, () => raw);
+    }
+
+    if (displayToQuery.isEmpty) {
+      setState(() {
+        _coursesLoading = false;
+      });
+      return;
+    }
+
+    final displayOptions = displayToQuery.keys.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    setState(() {
+      _courseDisplayToQuery = displayToQuery;
+      _courseOptions = displayOptions;
+      _coursesLoading = false;
+      if (!_courseOptions.contains(_selectedInterest) &&
+          _courseOptions.isNotEmpty) {
+        _selectedInterest = _courseOptions.first;
+      }
+    });
+  }
+
+  Future<void> _loadDistricts() async {
+    setState(() {
+      _districtsLoading = true;
+    });
+
+    final districts = await _apiService.getDistricts();
+    if (!mounted) return;
+
+    final normalized = districts
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    final resolved =
+        normalized.isEmpty ? _fallbackDistricts : ['Any', ...normalized];
+
+    setState(() {
+      _districtOptions = resolved;
+      _districtsLoading = false;
+      if (!_districtOptions.contains(_selectedDistrict)) {
+        _selectedDistrict = _districtOptions.first;
+      }
+    });
+  }
+
   void _nextPage() async {
     if (_currentStep < 2) {
+      if (_currentStep == 1) {
+        await _loadAvailableCoursesForCurrentInputs();
+      }
+
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -157,20 +386,76 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
 
     if (!mounted) return;
 
-    setState(() => _isLoading = false);
-
     final selectedCoursesForResults = <String>[_selectedInterest];
+    final interestQuery =
+        _courseDisplayToQuery[_selectedInterest] ?? _selectedInterest;
+    try {
+      String? effectiveDistrict =
+          _selectedDistrict == 'Any' ? null : _selectedDistrict;
+      List<Recommendation> recommendations =
+          await _apiService.getRecommendations(
+        category: _selectedCategory,
+        cutoff: _cutoff,
+        interest: interestQuery,
+        district: effectiveDistrict,
+      );
 
-    Navigator.pushNamed(context, AppRoutes.analysisResults, arguments: {
-      'name': _nameController.text.trim().isEmpty
-          ? 'Student'
-          : _nameController.text.trim(),
-      'category': _selectedCategory,
-      'cutoff': _cutoff,
-      'selectedCourses': selectedCoursesForResults,
-      'interest': _selectedInterest,
-      'district': _selectedDistrict == 'Any' ? null : _selectedDistrict,
-    });
+      if (!mounted) return;
+
+      if (recommendations.isEmpty && effectiveDistrict != null) {
+        final relaxedResults = await _apiService.getRecommendations(
+          category: _selectedCategory,
+          cutoff: _cutoff,
+          interest: interestQuery,
+          district: null,
+        );
+
+        if (!mounted) return;
+
+        if (relaxedResults.isNotEmpty) {
+          recommendations = relaxedResults;
+          _showSnackBar(
+            'No exact match in $effectiveDistrict. Showing best colleges from all districts.',
+          );
+          effectiveDistrict = null;
+        }
+      }
+
+      if (recommendations.isEmpty) {
+        final districtLabel = effectiveDistrict ?? 'all districts';
+        _showSnackBar(
+          'No exact $_selectedInterest seats found for $districtLabel at cutoff ${_cutoff.toStringAsFixed(1)}. Try Software/IT or another category.',
+        );
+      }
+
+      Navigator.pushNamed(context, AppRoutes.analysisResults, arguments: {
+        'name': _nameController.text.trim().isEmpty
+            ? 'Student'
+            : _nameController.text.trim(),
+        'category': _selectedCategory,
+        'cutoff': _cutoff,
+        'selectedCourses': selectedCoursesForResults,
+        'interest': interestQuery,
+        'district': effectiveDistrict,
+        'prefetchedRecommendations': recommendations,
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to fetch recommendations')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _previousPage() {
@@ -459,7 +744,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Using local district list for faster loading. Default district: Chennai.',
+            'Districts are loaded from live backend data.',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade600,
@@ -467,9 +752,16 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
             ),
           ),
           const SizedBox(height: 12),
+          if (_districtsLoading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: LinearProgressIndicator(minHeight: 3),
+            ),
           _buildSingleSelectDropdown(
-            options: _districts,
-            selectedItem: _selectedDistrict ?? 'Chennai',
+            options: _districtOptions.isEmpty
+                ? _fallbackDistricts
+                : _districtOptions,
+            selectedItem: _selectedDistrict,
             onChanged: (val) => setState(() => _selectedDistrict = val),
           ),
         ],
@@ -567,7 +859,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2))
                 : Text(
-                    _currentStep < 2 ? "Next →" : "Start Analysis 🚀",
+                    _currentStep < 2 ? "Next →" : "Search Colleges",
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold),
                   ),

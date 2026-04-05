@@ -5,142 +5,105 @@ import 'package:http/http.dart' as http;
 import '../models/recommendation.dart';
 
 class ApiService {
-  static const String _cloudRunApiBaseUrl =
-      'https://pathwise-backend-960480080568.us-central1.run.app/api';
-  static const bool _useCloudApiByDefault =
-      bool.fromEnvironment('USE_CLOUD_API', defaultValue: true);
-  static const String _apiBaseUrlOverride =
-      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  // Android emulator must use 10.0.2.2 to reach host machine localhost.
+  static const String _androidEmulatorBaseUrl = 'http://10.0.2.2:8080';
+
+  // Hosted backend fallback to ensure real data is available when local API is down.
+  static const String _cloudRunBaseUrl = String.fromEnvironment(
+    'CLOUD_API_BASE_URL',
+    defaultValue: 'https://pathwise-backend-z43lsllm3q-el.a.run.app',
+  );
+
+  // For real devices, pass your PC LAN IP with --dart-define=LOCAL_API_HOST=192.x.x.x.
   static const String _realDeviceHost =
       String.fromEnvironment('LOCAL_API_HOST', defaultValue: '192.168.1.100');
-  static const bool _androidEmulator =
-      bool.fromEnvironment('ANDROID_EMULATOR', defaultValue: true);
-  static const Duration _requestTimeout = Duration(seconds: 12);
-  static const Duration _metadataCacheTtl = Duration(minutes: 30);
-  static const Duration _recommendationCacheTtl = Duration(minutes: 3);
-  static final Map<String, _CachedRecommendations> _recommendationCache = {};
-  static List<String>? _districtCache;
-  static DateTime? _districtCacheAt;
-  static List<String>? _courseCache;
-  static DateTime? _courseCacheAt;
+
+  // Optional full override, e.g. --dart-define=API_BASE_URL=http://192.168.1.5:8080
+  static const String _apiBaseUrlOverride =
+      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  static const Duration _requestTimeout = Duration(seconds: 10);
+  static const Duration _localProbeTimeout = Duration(seconds: 2);
 
   String _normalizeBaseUrl(String rawBaseUrl) {
     final trimmed = rawBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    if (trimmed.isEmpty) {
-      return trimmed;
-    }
-
-    return trimmed.endsWith('/api') ? trimmed : '$trimmed/api';
+    return trimmed;
   }
 
-  List<String> _districtBaseCandidates() {
-    final candidates = <String>{};
+  List<String> _baseCandidates() {
+    final candidates = <String>[];
 
-    if (_apiBaseUrlOverride.trim().isNotEmpty) {
-      candidates.add(_normalizeBaseUrl(_apiBaseUrlOverride));
-    }
-
-    candidates.add(_normalizeBaseUrl(baseUrl));
-    candidates.add(_normalizeBaseUrl(_cloudRunApiBaseUrl));
-
-    return candidates.where((entry) => entry.isNotEmpty).toList();
-  }
-
-  String get baseUrl {
-    if (_apiBaseUrlOverride.isNotEmpty) {
-      return _normalizeBaseUrl(_apiBaseUrlOverride);
-    }
-
-    if (_useCloudApiByDefault) {
-      return _normalizeBaseUrl(_cloudRunApiBaseUrl);
+    final override = _normalizeBaseUrl(_apiBaseUrlOverride);
+    if (override.isNotEmpty) {
+      candidates.add(override);
+      return candidates;
     }
 
     if (kIsWeb) {
-      return _normalizeBaseUrl('http://localhost:8080/api');
+      candidates.add(_cloudRunBaseUrl);
+      candidates.add('http://localhost:8080');
+      return candidates;
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      const host = _androidEmulator ? '10.0.2.2' : _realDeviceHost;
-      return _normalizeBaseUrl('http://$host:8080/api');
+      candidates.add(_cloudRunBaseUrl);
+      candidates.add(_androidEmulatorBaseUrl);
+      candidates.add('http://$_realDeviceHost:8080');
+      return candidates;
     }
 
-    return _normalizeBaseUrl('http://$_realDeviceHost:8080/api');
+    candidates.add(_cloudRunBaseUrl);
+    candidates.add('http://$_realDeviceHost:8080');
+    candidates.add('http://localhost:8080');
+    return candidates;
   }
 
-  Future<List<String>> getDistricts() async {
-    if (_districtCache != null &&
-        _districtCacheAt != null &&
-        DateTime.now().difference(_districtCacheAt!) <= _metadataCacheTtl) {
-      return _districtCache!;
+  Duration _timeoutForBase(String base) {
+    final normalizedBase = _normalizeBaseUrl(base);
+    final normalizedCloud = _normalizeBaseUrl(_cloudRunBaseUrl);
+    if (normalizedBase == normalizedCloud) {
+      return _requestTimeout;
     }
-
-    final candidateBases = _districtBaseCandidates();
-    for (final candidateBase in candidateBases) {
-      final uri = _buildUriFromBase(candidateBase, '/districts');
-      try {
-        final response = await _get(uri);
-        if (response.statusCode != 200) {
-          debugPrint(
-              'District API failed with status ${response.statusCode} on $candidateBase');
-          continue;
-        }
-
-        final List<dynamic> decoded = json.decode(response.body);
-        final districts = decoded.map((e) => e.toString()).toList();
-        if (districts.isNotEmpty) {
-          _districtCache = List<String>.unmodifiable(districts);
-          _districtCacheAt = DateTime.now();
-          return districts;
-        }
-
-        debugPrint('District API returned empty list on $candidateBase');
-      } catch (e) {
-        debugPrint('Error fetching districts via $candidateBase: $e');
-      }
-    }
-
-    return [];
+    return _localProbeTimeout;
   }
 
-  Future<List<String>> getCourses() async {
-    if (_courseCache != null &&
-        _courseCacheAt != null &&
-        DateTime.now().difference(_courseCacheAt!) <= _metadataCacheTtl) {
-      return _courseCache!;
+  String _normalizeInterestForApi(String interest) {
+    final raw = interest.trim();
+    if (raw.isEmpty) {
+      return raw;
     }
 
-    final candidateBases = _districtBaseCandidates();
-    for (final candidateBase in candidateBases) {
-      final uri = _buildUriFromBase(candidateBase, '/courses');
-      try {
-        final response = await _get(uri);
-        if (response.statusCode != 200) {
-          debugPrint(
-              'Courses API failed with status ${response.statusCode} on $candidateBase');
-          continue;
-        }
+    final normalized =
+        raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+    const aliases = <String, String>{
+      'cs': 'Computer Science Engineering',
+      'cse': 'Computer Science Engineering',
+      'computer science and engineering': 'Computer Science Engineering',
+      'computer science engineering': 'Computer Science Engineering',
+      'ec': 'Electronics and Communication Engineering',
+      'ee': 'Electrical and Electronics Engineering',
+      'ei': 'Electronics and Instrumentation Engineering',
+      'it': 'Information Technology',
+      'ece': 'Electronics and Communication Engineering',
+      'eee': 'Electrical and Electronics Engineering',
+      'ad': 'Artificial Intelligence and Data Science',
+      'am': 'Artificial Intelligence and Machine Learning',
+      'mech': 'Mechanical Engineering',
+      'me': 'Mechanical Engineering',
+      'ce': 'Civil Engineering',
+      'civil': 'Civil Engineering',
+      'bt': 'Biotechnology',
+      'bme': 'Biomedical Engineering',
+    };
 
-        final List<dynamic> decoded = json.decode(response.body);
-        final courses = decoded
-            .map((e) => e.toString().trim())
-            .where((name) => name.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
+    return aliases[normalized] ?? raw;
+  }
 
-        if (courses.isNotEmpty) {
-          _courseCache = List<String>.unmodifiable(courses);
-          _courseCacheAt = DateTime.now();
-          return courses;
-        }
-
-        debugPrint('Courses API returned empty list on $candidateBase');
-      } catch (e) {
-        debugPrint('Error fetching courses via $candidateBase: $e');
-      }
-    }
-
-    return [];
+  Uri _buildUri(
+    String base,
+    String path, {
+    Map<String, String>? queryParameters,
+  }) {
+    return Uri.parse('$base$path').replace(queryParameters: queryParameters);
   }
 
   Future<List<Recommendation>> getRecommendations({
@@ -148,156 +111,153 @@ class ApiService {
     required double cutoff,
     required String interest,
     String? district,
-    String sortBy = 'best_match',
-    int page = 0,
-    int size = 20,
   }) async {
     final queryParams = <String, String>{
-      'category': category,
+      'category': category.trim().toUpperCase(),
       'cutoff': cutoff.toString(),
-      'interest': interest,
-      'sortBy': sortBy,
-      'page': page.toString(),
-      'size': size.toString(),
+      'interest': _normalizeInterestForApi(interest),
     };
-    if (district != null && district.isNotEmpty) {
-      queryParams['district'] = district;
+
+    final normalizedDistrict = district?.trim();
+    if (normalizedDistrict != null &&
+        normalizedDistrict.isNotEmpty &&
+        normalizedDistrict.toLowerCase() != 'any') {
+      queryParams['district'] = normalizedDistrict;
     }
 
-    final cacheKey = [
-      category.trim().toLowerCase(),
-      cutoff.toStringAsFixed(2),
-      interest.trim().toLowerCase(),
-      (district ?? '').trim().toLowerCase(),
-      sortBy.trim().toLowerCase(),
-      page,
-      size,
-    ].join('|');
+    Object? lastError;
+    for (final base in _baseCandidates()) {
+      final uri =
+          _buildUri(base, '/api/recommend', queryParameters: queryParams);
+      debugPrint('Recommendation request URL: $uri');
 
-    final cached = _recommendationCache[cacheKey];
-    if (cached != null && !cached.isExpired(_recommendationCacheTtl)) {
-      return cached.items;
-    }
+      try {
+        final timeout = _timeoutForBase(base);
+        final response = await http.get(uri).timeout(timeout);
+        debugPrint('Recommendation response status: ${response.statusCode}');
+        debugPrint('Recommendation response body: ${response.body}');
 
-    final uri = _buildUri('/recommend', queryParameters: queryParams);
+        if (response.statusCode != 200) {
+          lastError = Exception(
+            'Recommendation API failed with status ${response.statusCode}',
+          );
+          continue;
+        }
 
-    try {
-      final response = await _get(uri);
-
-      if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        final resultsRaw = _extractRecommendationArray(decoded);
+        final rawList = _extractRecommendationArray(decoded);
 
-        final items = resultsRaw
+        return rawList
             .whereType<Map>()
             .map((entry) =>
                 Recommendation.fromJson(Map<String, dynamic>.from(entry)))
             .toList();
-
-        _recommendationCache[cacheKey] = _CachedRecommendations(
-          items: List<Recommendation>.unmodifiable(items),
-          createdAt: DateTime.now(),
-        );
-
-        return items;
-      } else {
-        throw Exception(
-            'Failed to load recommendations: ${response.statusCode}');
-      }
-    } on Exception {
-      rethrow;
-    } catch (e) {
-      throw Exception('Failed to connect to backend: $e');
-    }
-  }
-
-  Uri _buildUri(
-    String path, {
-    Map<String, String>? queryParameters,
-  }) {
-    final uri = _buildUriFromBase(
-      baseUrl,
-      path,
-      queryParameters: queryParameters,
-    );
-    return uri;
-  }
-
-  Uri _buildUriFromBase(
-    String resolvedBaseUrl,
-    String path, {
-    Map<String, String>? queryParameters,
-  }) {
-    return Uri.parse('$resolvedBaseUrl$path')
-        .replace(queryParameters: queryParameters);
-  }
-
-  Future<http.Response> _get(Uri uri) async {
-    debugPrint('GET $uri');
-
-    final attemptTimeouts = <Duration>[
-      _requestTimeout,
-      const Duration(seconds: 18)
-    ];
-    Object? lastError;
-
-    for (var index = 0; index < attemptTimeouts.length; index++) {
-      final timeout = attemptTimeouts[index];
-      final isLastAttempt = index == attemptTimeouts.length - 1;
-
-      try {
-        final response = await http.get(uri).timeout(timeout);
-        debugPrint('Response status ${response.statusCode} for $uri');
-        return response;
       } on TimeoutException catch (error) {
         lastError = error;
-        if (!isLastAttempt) {
-          debugPrint(
-              'Timeout for $uri after ${timeout.inSeconds}s. Retrying once...');
-          continue;
-        }
-      } on http.ClientException catch (error) {
-        lastError = error;
-        final message = error.message.toLowerCase();
-        final retryable = message.contains('handshake') ||
-            message.contains('connection closed');
-        if (retryable && !isLastAttempt) {
-          debugPrint(
-              'Transient network error for $uri: ${error.message}. Retrying once...');
-          continue;
-        }
-
-        throw Exception(
-          'Network error while contacting $uri: ${error.message}. '
-          'Please verify internet connectivity and retry.',
-        );
+        debugPrint('Recommendation timeout for $uri');
       } catch (error) {
         lastError = error;
-        final message = error.toString().toLowerCase();
-        final retryable = message.contains('handshake') ||
-            message.contains('connection terminated');
-        if (retryable && !isLastAttempt) {
-          debugPrint('Handshake error for $uri. Retrying once...');
-          continue;
-        }
-
-        if (message.contains('handshake')) {
-          throw Exception(
-            'Secure connection failed during handshake for $uri. '
-            'Check mobile network stability and device date/time, then retry.',
-          );
-        }
+        debugPrint('Recommendation request failed for $uri: $error');
       }
     }
 
     if (lastError is TimeoutException) {
-      throw Exception(
-        'Request timed out while loading $uri. '
-        'Server may be waking up or network is slow. Please tap Retry.',
-      );
+      throw TimeoutException(
+          'Recommendation request timed out', _requestTimeout);
+    }
+    throw Exception('Failed to fetch recommendations');
+  }
+
+  Future<List<String>> getDistricts() async {
+    return _getStringList('/api/districts');
+  }
+
+  Future<List<String>> getCourses() async {
+    return _getStringList('/api/courses');
+  }
+
+  Future<List<String>> getAvailableCourses({
+    required String category,
+    required double cutoff,
+  }) async {
+    final queryParams = <String, String>{
+      'category': category.trim().toUpperCase(),
+      'cutoff': cutoff.toString(),
+    };
+
+    Object? lastError;
+    for (final base in _baseCandidates()) {
+      final uri = _buildUri(base, '/api/available-courses',
+          queryParameters: queryParams);
+      debugPrint('Available courses request URL: $uri');
+
+      try {
+        final timeout = _timeoutForBase(base);
+        final response = await http.get(uri).timeout(timeout);
+        debugPrint('Available courses response status: ${response.statusCode}');
+
+        if (response.statusCode != 200) {
+          lastError = Exception(
+              'Available courses API failed with status ${response.statusCode}');
+          continue;
+        }
+
+        final decoded = json.decode(response.body);
+        if (decoded is List) {
+          return decoded
+              .map((entry) => entry.toString().trim())
+              .where((entry) => entry.isNotEmpty)
+              .toList();
+        }
+      } on TimeoutException catch (error) {
+        lastError = error;
+        debugPrint('Available courses timeout for $uri');
+      } catch (error) {
+        lastError = error;
+        debugPrint('Available courses request failed for $uri: $error');
+      }
     }
 
-    throw Exception('Failed to load data from $uri. Please retry.');
+    debugPrint('Failed available courses request. Last error: $lastError');
+    return [];
+  }
+
+  Future<List<String>> _getStringList(String path) async {
+    Object? lastError;
+    for (final base in _baseCandidates()) {
+      final uri = _buildUri(base, path);
+      debugPrint('List request URL: $uri');
+
+      try {
+        final timeout = _timeoutForBase(base);
+        final response = await http.get(uri).timeout(timeout);
+        debugPrint('List response status: ${response.statusCode}');
+        debugPrint('List response body: ${response.body}');
+
+        if (response.statusCode != 200) {
+          lastError =
+              Exception('List API failed with status ${response.statusCode}');
+          continue;
+        }
+
+        final decoded = json.decode(response.body);
+        if (decoded is List) {
+          return decoded
+              .map((entry) => entry.toString().trim())
+              .where((entry) => entry.isNotEmpty)
+              .toList();
+        }
+      } on TimeoutException catch (error) {
+        lastError = error;
+        debugPrint('List timeout for $uri');
+      } catch (error) {
+        lastError = error;
+        debugPrint('List request failed for $uri: $error');
+      }
+    }
+
+    debugPrint('Failed list request for $path. Last error: $lastError');
+    return [];
   }
 
   List<dynamic> _extractRecommendationArray(dynamic decoded) {
@@ -306,46 +266,12 @@ class ApiService {
     }
 
     if (decoded is Map<String, dynamic>) {
-      for (final key in const [
-        'results',
-        'recommendations',
-        'data',
-        'content',
-        'items'
-      ]) {
-        final value = decoded[key];
-        if (value is List) {
-          return value;
-        }
-
-        if (value is Map<String, dynamic>) {
-          for (final nestedKey in const [
-            'results',
-            'recommendations',
-            'content',
-            'items'
-          ]) {
-            final nestedValue = value[nestedKey];
-            if (nestedValue is List) {
-              return nestedValue;
-            }
-          }
-        }
+      final results = decoded['results'];
+      if (results is List) {
+        return results;
       }
     }
 
     return const [];
   }
-}
-
-class _CachedRecommendations {
-  final List<Recommendation> items;
-  final DateTime createdAt;
-
-  const _CachedRecommendations({
-    required this.items,
-    required this.createdAt,
-  });
-
-  bool isExpired(Duration ttl) => DateTime.now().difference(createdAt) > ttl;
 }

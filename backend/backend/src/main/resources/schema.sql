@@ -17,18 +17,28 @@ CREATE TABLE IF NOT EXISTS courses (
 
 -- 3. Create Cutoff History Table
 CREATE TABLE IF NOT EXISTS cutoff_history (
-    cutoff_id BIGSERIAL PRIMARY KEY,
-    year INTEGER NOT NULL,
-    college_id BIGINT NOT NULL,
-    course_id BIGINT NOT NULL,
-    category VARCHAR(50),
-    opening_cutoff DOUBLE PRECISION,
-    closing_cutoff DOUBLE PRECISION,
-    CONSTRAINT fk_college_cutoff FOREIGN KEY(college_id) REFERENCES colleges(college_id) ON DELETE CASCADE,
-    CONSTRAINT fk_course_cutoff FOREIGN KEY(course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+    college_code VARCHAR(50) NOT NULL,
+    college_name VARCHAR(255) NOT NULL,
+    branch VARCHAR(255) NOT NULL,
+    oc_max DOUBLE PRECISION,
+    oc_min DOUBLE PRECISION,
+    bcm_max DOUBLE PRECISION,
+    bcm_min DOUBLE PRECISION,
+    bc_max DOUBLE PRECISION,
+    bc_min DOUBLE PRECISION,
+    mbc_max DOUBLE PRECISION,
+    mbc_min DOUBLE PRECISION,
+    sc_max DOUBLE PRECISION,
+    sc_min DOUBLE PRECISION,
+    sca_max DOUBLE PRECISION,
+    sca_min DOUBLE PRECISION,
+    st_max DOUBLE PRECISION,
+    st_min DOUBLE PRECISION,
+    PRIMARY KEY (college_code, branch)
 );
 
 -- CREATE INDEXES for performance
 CREATE INDEX IF NOT EXISTS idx_college_id_courses ON courses(college_id);
-CREATE INDEX IF NOT EXISTS idx_college_id_cutoff ON cutoff_history(college_id);
-CREATE INDEX IF NOT EXISTS idx_course_id_cutoff ON cutoff_history(course_id);
+
+CREATE INDEX IF NOT EXISTS idx_cutoff_college_code ON cutoff_history(college_code);
+CREATE INDEX IF NOT EXISTS idx_cutoff_branch ON cutoff_history(branch);

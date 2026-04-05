@@ -15,5 +15,4 @@ public class RecommendationResponse {
     private String collegeType;
     private Double cutoff;
     private Double score;
-    private String recommendationType;
 }

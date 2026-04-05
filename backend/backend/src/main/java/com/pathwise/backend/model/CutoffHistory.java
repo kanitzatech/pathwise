@@ -5,6 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "cutoff_history")
+@IdClass(CutoffHistoryId.class)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,27 +14,55 @@ import lombok.*;
 public class CutoffHistory {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "cutoff_id")
-    private Integer cutoffId;
+    @Column(name = "college_code")
+    private String collegeCode;
 
-    @Column(name = "year")
-    private Integer year;
+    @Id
+    @Column(name = "branch")
+    private String branch;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "college_id", nullable = false)
-    private College college;
+    @Column(name = "college_name")
+    private String collegeName;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", nullable = false)
-    private Course course;
+    @Column(name = "oc_max")
+    private Double ocMax;
 
-    @Column(name = "category")
-    private String category;
+    @Column(name = "oc_min")
+    private Double ocMin;
 
-    @Column(name = "opening_cutoff")
-    private Double openingCutoff;
+    @Column(name = "bcm_max")
+    private Double bcmMax;
 
-    @Column(name = "closing_cutoff")
-    private Double closingCutoff;
+    @Column(name = "bcm_min")
+    private Double bcmMin;
+
+    @Column(name = "bc_max")
+    private Double bcMax;
+
+    @Column(name = "bc_min")
+    private Double bcMin;
+
+    @Column(name = "mbc_max")
+    private Double mbcMax;
+
+    @Column(name = "mbc_min")
+    private Double mbcMin;
+
+    @Column(name = "sc_max")
+    private Double scMax;
+
+    @Column(name = "sc_min")
+    private Double scMin;
+
+    @Column(name = "sca_max")
+    private Double scaMax;
+
+    @Column(name = "sca_min")
+    private Double scaMin;
+
+    @Column(name = "st_max")
+    private Double stMax;
+
+    @Column(name = "st_min")
+    private Double stMin;
 }
