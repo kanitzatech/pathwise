@@ -9,7 +9,16 @@ import com.pathwise.backend.repository.CutoffHistoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -20,43 +29,14 @@ public class RecommendationService {
     private final CollegeRepository collegeRepository;
     private final CourseRepository courseRepository;
 
-    /**
-     * Maps a student's broad interest area to specific course-name keywords.
-     * Keys are lowercase for case-insensitive matching.
-     */
-    private static final Map<String, List<String>> INTEREST_COURSE_MAP;
-
     private static final Pattern NON_ALNUM_PATTERN = Pattern.compile("[^a-z0-9]+");
     private static final Pattern SPACE_PATTERN = Pattern.compile("\\s+");
 
-    static {
-        Map<String, List<String>> map = new LinkedHashMap<>();
-        map.put("software",    List.of(
-                "cs", "cse", "computer science", "computer science engineering",
-                "cb", "cd", "cg", "co", "cn", "cr", "cw", "cy", "cz", "sc",
-                "csbs", "cst",
-                "ad", "am", "artificial intelligence", "ai", "data science", "cyber security"
-        ));
-        map.put("computer science engineering", List.of(
-                "cs", "cse", "computer science", "computer science engineering",
-                "computer science and business systems", "csbs", "cst",
-                "cb", "cd", "cg", "co", "cn", "cr", "cw", "cy", "cz", "sc",
-                "cys", "artificial intelligence", "ai", "machine learning", "ai ml",
-                "ai ds", "artificial intelligence and data science", "ad", "am",
-                "data science", "cyber security", "iot"
-        ));
-        map.put("information technology", List.of("information technology", "it", "im", "iy", "information science", "ise"));
-        map.put("electronics", List.of("ec", "ee", "ei", "ece", "eee", "eie", "electronics", "electrical", "communication"));
-        map.put("electronics and communication engineering", List.of("ec", "ece", "electronics", "communication"));
-        map.put("electrical and electronics engineering", List.of("ee", "eee", "electrical", "electronics"));
-        map.put("mechanical",  List.of("me", "ma", "mc", "md", "mf", "mg", "mm", "mn", "mr", "ms", "mt", "mz", "mechanical"));
-        map.put("mechanical engineering", List.of("me", "ma", "mc", "md", "mf", "mg", "mm", "mn", "mr", "ms", "mt", "mz", "mechanical"));
-        map.put("civil", List.of("ce", "ci", "cl", "civil"));
-        map.put("civil engineering", List.of("ce", "ci", "cl", "civil"));
-        map.put("biomedical", List.of("bm", "bme", "bs", "by", "biomedical"));
-        map.put("biomedical engineering", List.of("bm", "bme", "bs", "by", "biomedical"));
-        INTEREST_COURSE_MAP = Collections.unmodifiableMap(map);
-    }
+    private static final String DREAM = "dream";
+    private static final String TARGET = "target";
+    private static final String SAFE = "safe";
+
+    private static final Map<String, List<String>> STRICT_COURSE_EQUIVALENTS = buildStrictCourseEquivalents();
 
     public RecommendationService(
             CutoffHistoryRepository cutoffHistoryRepository,
@@ -98,55 +78,198 @@ public class RecommendationService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecommendationResponse> getRecommendations(String category, Double cutoff, String interest, String district) {
+    public List<RecommendationResponse> getRecommendations(String category, Double cutoff, String courseName, String district) {
+        return flattenGrouped(getGroupedRecommendations(category, cutoff, courseName, district));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, List<RecommendationResponse>> getGroupedRecommendations(
+            String category,
+            Double cutoff,
+            String courseName,
+            String district
+    ) {
+        final Map<String, List<RecommendationResponse>> grouped = emptyGroupedResult();
         String normalizedCategory = normalizeCategory(category);
-        if (normalizedCategory == null || cutoff == null) {
-            return Collections.emptyList();
+        if (normalizedCategory == null || cutoff == null || cutoff <= 0) {
+            return grouped;
         }
 
-        List<String> courseKeywords = resolveCourseNames(interest);
-        if (courseKeywords.isEmpty()) {
-            return Collections.emptyList();
+        List<String> exactCourseCandidates = resolveExactCourseCandidates(courseName);
+        if (exactCourseCandidates.isEmpty()) {
+            return grouped;
         }
 
-        String requestedDistrict = normalizeText(district);
-        Map<String, College> collegeByName = buildCollegeLookup();
+        final double maxEligibleCutoff = cutoff + 5.0;
+        final String requestedDistrict = normalizeText(district);
+        final Map<String, College> collegeByName = buildCollegeLookup();
 
-        List<CutoffHistory> rows = cutoffHistoryRepository.findRecommendationsByCategoryAndCutoff(normalizedCategory, cutoff);
+        final Map<String, RecommendationResponse> uniqueByCollegeCourse = new LinkedHashMap<>();
 
-        return rows.stream()
-                .filter(ch -> branchMatchesInterest(ch.getBranch(), courseKeywords))
-                .map(ch -> {
-                    double selectedCutoff = getCutoffByCategory(ch, normalizedCategory);
-                    if (Double.isNaN(selectedCutoff)) {
-                        return null;
-                    }
+        for (String candidate : exactCourseCandidates) {
+            List<CutoffHistory> rows = cutoffHistoryRepository
+                    .findRankedRecommendationsByCategoryCourseAndCutoff(normalizedCategory, candidate, maxEligibleCutoff);
 
-                    College college = findCollegeDetails(ch.getCollegeName(), collegeByName);
-                    String collegeDistrict = college == null ? null : safeTrim(college.getDistrict());
-                    String collegeType = college == null ? null : safeTrim(college.getCollegeType());
+            for (CutoffHistory row : rows) {
+                double selectedCutoff = getCutoffByCategory(row, normalizedCategory);
+                if (Double.isNaN(selectedCutoff)) {
+                    continue;
+                }
 
-                    if (!districtMatches(requestedDistrict, collegeDistrict, ch.getCollegeName())) {
-                        return null;
-                    }
+                String categoryBucket = classifyRecommendationType(cutoff, selectedCutoff);
+                if (categoryBucket == null) {
+                    continue;
+                }
 
-                    double score = calculateMatchScore(cutoff, selectedCutoff);
+                College college = findCollegeDetails(row.getCollegeName(), collegeByName);
+                String collegeDistrict = college == null ? null : safeTrim(college.getDistrict());
+                String collegeType = college == null ? null : safeTrim(college.getCollegeType());
 
-                    return RecommendationResponse.builder()
-                            .collegeName(ch.getCollegeName())
-                            .courseName(mapToFullName(ch.getBranch()))
-                            .district(collegeDistrict)
-                            .cutoff(selectedCutoff)
-                            .score(score)
-                            .collegeType(collegeType)
-                            .build();
-                })
-                .filter(Objects::nonNull)
-                .filter(dto -> dto.getCollegeName() != null && dto.getCourseName() != null && dto.getCutoff() != null)
-                .sorted(Comparator
-                        .comparing(RecommendationResponse::getScore, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(RecommendationResponse::getCutoff, Comparator.nullsLast(Comparator.reverseOrder())))
+                if (!districtMatches(requestedDistrict, collegeDistrict, row.getCollegeName())) {
+                    continue;
+                }
+
+                int collegeRank = resolveCollegeRank(row.getCollegeName(), collegeType);
+                int probability = calculateProbability(cutoff, selectedCutoff);
+
+                RecommendationResponse dto = RecommendationResponse.builder()
+                        .collegeName(row.getCollegeName())
+                        .courseName(mapToFullName(row.getBranch()))
+                        .district(collegeDistrict)
+                        .collegeType(collegeType)
+                        .cutoff(selectedCutoff)
+                        .probability(probability)
+                        .category(categoryBucket)
+                        .score((double) probability)
+                        .recommendationType(categoryBucket)
+                        .collegeRank(collegeRank)
+                        .build();
+
+                String uniqueKey = buildUniqueKey(dto.getCollegeName(), dto.getCourseName());
+                RecommendationResponse existing = uniqueByCollegeCourse.get(uniqueKey);
+                if (existing == null || compareRecommendations(dto, existing) < 0) {
+                    uniqueByCollegeCourse.put(uniqueKey, dto);
+                }
+            }
+        }
+
+        List<RecommendationResponse> sorted = uniqueByCollegeCourse.values().stream()
+                .sorted(this::compareRecommendations)
                 .collect(Collectors.toList());
+
+        grouped.put(DREAM, sorted.stream().filter(item -> DREAM.equals(resolveCategory(item))).collect(Collectors.toList()));
+        grouped.put(TARGET, sorted.stream().filter(item -> TARGET.equals(resolveCategory(item))).collect(Collectors.toList()));
+        grouped.put(SAFE, sorted.stream().filter(item -> SAFE.equals(resolveCategory(item))).collect(Collectors.toList()));
+
+        return grouped;
+    }
+
+    private Map<String, List<RecommendationResponse>> emptyGroupedResult() {
+        Map<String, List<RecommendationResponse>> result = new LinkedHashMap<>();
+        result.put(DREAM, new ArrayList<>());
+        result.put(TARGET, new ArrayList<>());
+        result.put(SAFE, new ArrayList<>());
+        return result;
+    }
+
+    private List<RecommendationResponse> flattenGrouped(Map<String, List<RecommendationResponse>> grouped) {
+        List<RecommendationResponse> flat = new ArrayList<>();
+        flat.addAll(grouped.getOrDefault(DREAM, Collections.emptyList()));
+        flat.addAll(grouped.getOrDefault(TARGET, Collections.emptyList()));
+        flat.addAll(grouped.getOrDefault(SAFE, Collections.emptyList()));
+        return flat;
+    }
+
+    private int compareRecommendations(RecommendationResponse left, RecommendationResponse right) {
+        int rankCompare = Integer.compare(safeRank(left), safeRank(right));
+        if (rankCompare != 0) {
+            return rankCompare;
+        }
+
+        int cutoffCompare = Double.compare(safeDouble(right.getCutoff()), safeDouble(left.getCutoff()));
+        if (cutoffCompare != 0) {
+            return cutoffCompare;
+        }
+
+        int scoreCompare = Integer.compare(safeProbability(right), safeProbability(left));
+        if (scoreCompare != 0) {
+            return scoreCompare;
+        }
+
+        return safeTrim(left.getCollegeName()).compareToIgnoreCase(safeTrim(right.getCollegeName()));
+    }
+
+    private int safeRank(RecommendationResponse value) {
+        return value == null || value.getCollegeRank() == null ? 3 : value.getCollegeRank();
+    }
+
+    private double safeDouble(Double value) {
+        return value == null ? 0.0 : value;
+    }
+
+    private int safeProbability(RecommendationResponse value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value.getProbability() != null) {
+            return value.getProbability();
+        }
+
+        double legacy = safeDouble(value.getScore());
+        if (legacy >= 0.0 && legacy <= 1.0) {
+            legacy = legacy * 100.0;
+        }
+        return (int) Math.round(Math.max(0.0, Math.min(100.0, legacy)));
+    }
+
+    private String resolveCategory(RecommendationResponse item) {
+        if (item == null) {
+            return SAFE;
+        }
+
+        String category = safeTrim(item.getCategory()).toLowerCase(Locale.ROOT);
+        if (DREAM.equals(category) || TARGET.equals(category) || SAFE.equals(category)) {
+            return category;
+        }
+
+        String legacyType = safeTrim(item.getRecommendationType()).toLowerCase(Locale.ROOT);
+        if (DREAM.equals(legacyType) || TARGET.equals(legacyType) || SAFE.equals(legacyType)) {
+            return legacyType;
+        }
+
+        return SAFE;
+    }
+
+    private String buildUniqueKey(String collegeName, String courseName) {
+        return normalizeText(collegeName) + "|" + normalizeText(courseName);
+    }
+
+    private String classifyRecommendationType(double studentCutoff, double closingCutoff) {
+        double margin = studentCutoff - closingCutoff;
+        if (margin >= 10.0) {
+            return SAFE;
+        }
+        if (margin >= 0.0) {
+            return TARGET;
+        }
+        if (margin >= -5.0) {
+            return DREAM;
+        }
+        return null;
+    }
+
+    private int calculateProbability(double studentCutoff, double closingCutoff) {
+        double diff = studentCutoff - closingCutoff;
+        double raw;
+
+        if (diff >= 0.0) {
+            raw = 85.0 - (diff * 1.5);
+        } else {
+            raw = 50.0 + (diff * 2.5);
+        }
+
+        double bounded = Math.max(5.0, Math.min(95.0, raw));
+        return (int) Math.round(bounded);
     }
 
     private Map<String, College> buildCollegeLookup() {
@@ -179,8 +302,8 @@ public class RecommendationService {
         }
 
         return collegeByName.entrySet().stream()
-            .filter(entry -> normalizedRaw.contains(entry.getKey())
-                || (!primaryName.isBlank() && entry.getKey().contains(primaryName)))
+                .filter(entry -> normalizedRaw.contains(entry.getKey())
+                        || (!primaryName.isBlank() && entry.getKey().contains(primaryName)))
                 .max(Comparator.comparingInt(entry -> entry.getKey().length()))
                 .map(Map.Entry::getValue)
                 .orElse(null);
@@ -199,19 +322,28 @@ public class RecommendationService {
         return normalizedCollegeName.contains(requestedDistrict);
     }
 
-    private double calculateMatchScore(double studentCutoff, double collegeCutoff) {
-        if (studentCutoff <= 0) {
-            return 0.0;
+    private int resolveCollegeRank(String collegeName, String collegeType) {
+        String normalizedName = normalizeText(collegeName);
+        String normalizedType = normalizeText(collegeType);
+
+        if (normalizedName.contains("anna university")
+                || normalizedName.contains("ceg")
+                || normalizedName.contains("mit campus")
+                || normalizedName.contains("act campus")
+                || normalizedName.contains("ssn")
+                || normalizedName.contains("psg")
+                || normalizedName.contains("coimbatore institute of technology")
+                || normalizedName.equals("cit")
+                || normalizedName.contains("srm institute of science and technology")
+                || normalizedName.contains("srm university kattankulathur")) {
+            return 1;
         }
 
-        double gap = Math.max(0.0, studentCutoff - collegeCutoff);
-        double relativeGap = gap / studentCutoff;
-        double score = (1.0 - relativeGap) * 100.0;
-        return Math.max(0.0, Math.min(100.0, roundToTwoDecimals(score)));
-    }
+        if (normalizedType.contains("autonomous") || normalizedName.contains("autonomous")) {
+            return 2;
+        }
 
-    private double roundToTwoDecimals(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        return 3;
     }
 
     private String extractPrimaryCollegeName(String collegeName) {
@@ -276,9 +408,81 @@ public class RecommendationService {
         }
     }
 
-    /**
-     * Helper to map a raw string or code from DB to a clean, user-friendly full course name.
-     */
+    private List<String> resolveExactCourseCandidates(String courseInput) {
+        if (courseInput == null || courseInput.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        String cleaned = courseInput.trim();
+        String normalized = normalizeText(cleaned);
+
+        LinkedHashSet<String> candidates = new LinkedHashSet<>();
+        candidates.add(cleaned);
+
+        List<String> mapped = STRICT_COURSE_EQUIVALENTS.get(normalized);
+        if (mapped != null) {
+            candidates.addAll(mapped);
+        }
+
+        return candidates.stream()
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toList());
+    }
+
+    private static Map<String, List<String>> buildStrictCourseEquivalents() {
+        Map<String, List<String>> map = new LinkedHashMap<>();
+
+        putCourseAliases(map,
+                Arrays.asList("cse", "cs", "computer science engineering", "computer science and engineering"),
+                Arrays.asList("CSE", "CS", "Computer Science Engineering", "Computer Science and Engineering"));
+
+        putCourseAliases(map,
+                Arrays.asList("it", "information technology"),
+                Arrays.asList("IT", "Information Technology"));
+
+        putCourseAliases(map,
+                Arrays.asList("ece", "ec", "electronics and communication engineering"),
+                Arrays.asList("ECE", "EC", "Electronics and Communication Engineering"));
+
+        putCourseAliases(map,
+                Arrays.asList("eee", "ee", "electrical and electronics engineering"),
+                Arrays.asList("EEE", "EE", "Electrical and Electronics Engineering"));
+
+        putCourseAliases(map,
+                Arrays.asList("ad", "ai ds", "ai and data science", "artificial intelligence and data science", "ai&ds"),
+                Arrays.asList("AD", "AI&DS", "Artificial Intelligence and Data Science"));
+
+        putCourseAliases(map,
+                Arrays.asList("am", "ai ml", "ai and machine learning", "artificial intelligence and machine learning"),
+                Arrays.asList("AM", "Artificial Intelligence and Machine Learning"));
+
+        putCourseAliases(map,
+                Arrays.asList("me", "mechanical engineering"),
+                Arrays.asList("ME", "Mechanical Engineering"));
+
+        putCourseAliases(map,
+                Arrays.asList("ce", "civil engineering", "civil"),
+                Arrays.asList("CE", "Civil Engineering"));
+
+        putCourseAliases(map,
+                Arrays.asList("bme", "biomedical engineering", "biomedical"),
+                Arrays.asList("BME", "Biomedical Engineering"));
+
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static void putCourseAliases(
+            Map<String, List<String>> target,
+            List<String> keys,
+            List<String> aliases
+    ) {
+        for (String key : keys) {
+            String normalized = key.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
+            target.put(normalized, aliases);
+        }
+    }
+
     private String mapToFullName(String rawName) {
         if (rawName == null) return "Unknown Course";
         String trimmed = rawName.trim();
@@ -289,37 +493,12 @@ public class RecommendationService {
             case "computer science engineering":
             case "computer science and engineering":
                 return "Computer Science Engineering";
-            case "cb":
-            case "csbs":
-            case "computer science and business systems":
-                return "Computer Science and Business Systems";
-            case "cd":
-                return "Computer Science and Design";
-            case "cg":
-                return "Computer Science and Engineering (AI and ML)";
-            case "co":
-                return "Computer Science and Engineering (IoT)";
-            case "cn":
-                return "Computer Science and Engineering (Networks)";
-            case "cr":
-            case "sc":
-                return "Computer Science and Engineering (Cyber Security)";
-            case "cw":
-                return "Computer Science and Engineering (Data Science)";
-            case "cz":
-                return "Computer Science and Engineering (Specialization)";
-            case "cst":
-                return "Computer Science and Technology";
-            case "cys":
-            case "cy":
-                return "Cyber Security";
             case "ad":
             case "ai&ds":
             case "ai ds":
             case "artificial intelligence and data science":
                 return "Artificial Intelligence and Data Science";
             case "am":
-            case "cse (ai&ml)":
             case "ai ml":
             case "artificial intelligence and machine learning":
                 return "Artificial Intelligence and Machine Learning";
@@ -343,116 +522,17 @@ public class RecommendationService {
             case "civil":
                 return "Civil Engineering";
             case "me":
-            case "ma":
-            case "mc":
-            case "md":
-            case "mf":
-            case "mg":
-            case "mm":
-            case "mn":
-            case "mr":
-            case "ms":
-            case "mt":
-            case "mz":
             case "mechanical engineering":
                 return "Mechanical Engineering";
-            case "ae":
-                return "Aeronautical Engineering";
-            case "ag":
-                return "Agricultural Engineering";
-            case "au":
-                return "Automobile Engineering";
-            case "bt":
-                return "Biotechnology";
-            case "ch":
-                return "Chemical Engineering";
             case "bm":
             case "bme":
-            case "bs":
-            case "by":
             case "biomedical engineering":
                 return "Biomedical Engineering";
-            case "ra":
-            case "rm":
-                return "Robotics and Automation";
-            case "tc":
-                return "Textile Chemistry";
-            case "tx":
-            case "tt":
-            case "ht":
-                return "Textile Technology";
-            case "pc":
-            case "pm":
-            case "pa":
-            case "petro":
-            case "petrochemical e":
-                return "Petrochemical Engineering";
-            case "ph":
-                return "Pharmaceutical Technology";
-            case "pt":
-            case "pp":
-            case "rp":
-                return "Polymer and Plastics Technology";
             default:
                 if (trimmed.length() <= 3 && !trimmed.contains(" ")) {
                     return "Specialization (" + trimmed.toUpperCase(Locale.ROOT) + ")";
                 }
-                return rawName; // Fallback to raw DB name if not recognized
+                return trimmed;
         }
-    }
-
-    private boolean branchMatchesInterest(String branch, List<String> courseKeywords) {
-        if (branch == null || courseKeywords == null || courseKeywords.isEmpty()) {
-            return false;
-        }
-        String normalizedBranch = normalizeText(branch);
-
-        for (String keyword : courseKeywords) {
-            String normalizedKeyword = normalizeText(keyword);
-            if (normalizedKeyword.isBlank()) {
-                continue;
-            }
-
-            if (normalizedKeyword.length() <= 2) {
-                List<String> branchTokens = Arrays.asList(normalizedBranch.split(" "));
-                if (branchTokens.contains(normalizedKeyword)) {
-                    return true;
-                }
-                continue;
-            }
-
-            if (normalizedBranch.contains(normalizedKeyword)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Resolves a broad interest keyword to a list of lowercase course-name search terms.
-     *
-     * @param interest  e.g. "Software", "Electronics", "Mechanical"
-     * @return matching course name keywords, or empty list if interest is unknown
-     */
-    private List<String> resolveCourseNames(String interest) {
-        if (interest == null || interest.isBlank()) {
-            return Collections.emptyList();
-        }
-
-        String normalizedInterest = normalizeText(interest);
-        List<String> mapped = INTEREST_COURSE_MAP.get(normalizedInterest);
-        if (mapped != null && !mapped.isEmpty()) {
-            return mapped.stream().map(this::normalizeText).distinct().collect(Collectors.toList());
-        }
-
-        for (Map.Entry<String, List<String>> entry : INTEREST_COURSE_MAP.entrySet()) {
-            if (normalizedInterest.contains(entry.getKey()) || entry.getKey().contains(normalizedInterest)) {
-                return entry.getValue().stream().map(this::normalizeText).distinct().collect(Collectors.toList());
-            }
-        }
-
-        // If no broad mapping exists, treat user input as a direct course name filter.
-        return List.of(normalizedInterest);
     }
 }

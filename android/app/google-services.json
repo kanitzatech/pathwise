@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "960480080568",
+    "project_id": "pathwise-backend-491815",
+    "storage_bucket": "pathwise-backend-491815.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:960480080568:android:29966f0401803d7b18fa4d",
+        "android_client_info": {
+          "package_name": "com.pathwise.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "960480080568-nfbtmeipjan3mg1ssuskod7padmnls40.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdoYsit0CdxnYPGVCLCcBOrGkLpxCk4mM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "960480080568-nfbtmeipjan3mg1ssuskod7padmnls40.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

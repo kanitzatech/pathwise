@@ -180,6 +180,14 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     'TT': 'Textile Technology',
   };
 
+  void _seedFallbackOptions() {
+    _courseOptions = List<String>.from(_fallbackCourses);
+    _courseDisplayToQuery = {
+      for (final course in _fallbackCourses) course: course,
+    };
+    _districtOptions = List<String>.from(_fallbackDistricts);
+  }
+
   String _toFullCourseName(String rawCourse) {
     final trimmed = rawCourse.trim();
     if (trimmed.isEmpty) {
@@ -202,6 +210,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
   @override
   void initState() {
     super.initState();
+    _seedFallbackOptions();
     _physicsController.addListener(_calculateCutoff);
     _chemistryController.addListener(_calculateCutoff);
     _mathsController.addListener(_calculateCutoff);
@@ -271,6 +280,10 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
 
   Future<void> _loadAvailableCoursesForCurrentInputs() async {
     if (_selectedCategory.isEmpty || _cutoff <= 0) {
+      return;
+    }
+
+    if (_coursesLoading) {
       return;
     }
 
@@ -357,7 +370,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
   void _nextPage() async {
     if (_currentStep < 2) {
       if (_currentStep == 1) {
-        await _loadAvailableCoursesForCurrentInputs();
+        _loadAvailableCoursesForCurrentInputs();
       }
 
       _pageController.nextPage(
@@ -390,7 +403,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     final interestQuery =
         _courseDisplayToQuery[_selectedInterest] ?? _selectedInterest;
     try {
-      String? effectiveDistrict =
+      final String? effectiveDistrict =
           _selectedDistrict == 'Any' ? null : _selectedDistrict;
       List<Recommendation> recommendations =
           await _apiService.getRecommendations(
@@ -401,25 +414,6 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
       );
 
       if (!mounted) return;
-
-      if (recommendations.isEmpty && effectiveDistrict != null) {
-        final relaxedResults = await _apiService.getRecommendations(
-          category: _selectedCategory,
-          cutoff: _cutoff,
-          interest: interestQuery,
-          district: null,
-        );
-
-        if (!mounted) return;
-
-        if (relaxedResults.isNotEmpty) {
-          recommendations = relaxedResults;
-          _showSnackBar(
-            'No exact match in $effectiveDistrict. Showing best colleges from all districts.',
-          );
-          effectiveDistrict = null;
-        }
-      }
 
       if (recommendations.isEmpty) {
         final districtLabel = effectiveDistrict ?? 'all districts';

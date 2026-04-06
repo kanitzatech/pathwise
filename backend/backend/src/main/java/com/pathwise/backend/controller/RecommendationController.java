@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -43,13 +44,14 @@ public class RecommendationController {
     }
 
     @GetMapping("/recommend")
-    public ResponseEntity<List<RecommendationResponse>> recommend(
+    public ResponseEntity<Map<String, List<RecommendationResponse>>> recommend(
             @RequestParam String category,
             @RequestParam Double cutoff,
             @RequestParam String interest,
             @RequestParam(required = false) String district) {
 
-        List<RecommendationResponse> response = recommendationService.getRecommendations(category, cutoff, interest, district);
+        Map<String, List<RecommendationResponse>> response =
+                recommendationService.getGroupedRecommendations(category, cutoff, interest, district);
 
         return ResponseEntity.ok(response);
     }
