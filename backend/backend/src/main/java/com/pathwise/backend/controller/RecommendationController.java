@@ -36,22 +36,18 @@ public class RecommendationController {
         return ResponseEntity.ok(recommendationService.getAllCourses());
     }
 
-    @GetMapping("/available-courses")
-    public ResponseEntity<List<String>> getAvailableCourses(
-            @RequestParam String category,
-            @RequestParam Double cutoff) {
-        return ResponseEntity.ok(recommendationService.getAvailableCourses(category, cutoff));
-    }
-
     @GetMapping("/recommend")
-    public ResponseEntity<Map<String, List<RecommendationResponse>>> recommend(
+    public ResponseEntity<Map<String, Object>> recommend(
             @RequestParam String category,
             @RequestParam Double cutoff,
             @RequestParam String interest,
-            @RequestParam(required = false) String district) {
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false, defaultValue = "best_match") String sortBy,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        Map<String, List<RecommendationResponse>> response =
-                recommendationService.getGroupedRecommendations(category, cutoff, interest, district);
+        Map<String, Object> response =
+                recommendationService.getRecommendations(category, cutoff, interest, district, sortBy, page, size);
 
         return ResponseEntity.ok(response);
     }

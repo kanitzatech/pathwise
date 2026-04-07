@@ -27,19 +27,16 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
   final TextEditingController _chemistryController = TextEditingController();
   final TextEditingController _mathsController = TextEditingController();
   double _cutoff = 0.0;
-  final List<String> _categories = [
-    'OC',
-    'BC',
-    'BCM',
-    'MBC',
-    'SC',
-    'SCA',
-    'ST'
-  ];
+  final List<String> _categories = ['OC', 'BC', 'MBC', 'SC', 'ST'];
 
   // Final Selection Data
-  String _selectedDistrict = 'Any';
+  String? _selectedDistrict = 'Chennai';
   String _selectedInterest = 'Computer Science Engineering';
+
+  // Screen 3 Data
+  final List<String> _selectedCourses = [];
+  final List<String> _selectedColleges = [];
+
   final List<String> _fallbackCourses = [
     'Computer Science Engineering',
     'Information Technology',
@@ -64,11 +61,9 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     'VIT Chennai',
   ];
   List<String> _courseOptions = [];
-  Map<String, String> _courseDisplayToQuery = {};
   bool _coursesLoading = false;
-  bool _districtsLoading = false;
-  List<String> _districtOptions = const ['Any'];
-  static const List<String> _fallbackDistricts = [
+  bool _loadedCoursesFromApi = false;
+  final List<String> _districts = [
     'Any',
     'Ariyalur',
     'Chengalpattu',
@@ -105,130 +100,13 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     'Virudhunagar',
   ];
 
-  static const Map<String, String> _courseCodeToFullName = {
-    'CS': 'Computer Science Engineering',
-    'EC': 'Electronics and Communication Engineering',
-    'EE': 'Electrical and Electronics Engineering',
-    'EI': 'Electronics and Instrumentation Engineering',
-    'CE': 'Civil Engineering',
-    'CI': 'Civil Engineering',
-    'CL': 'Civil Engineering',
-    'AD': 'Artificial Intelligence and Data Science',
-    'AM': 'Artificial Intelligence and Machine Learning',
-    'CB': 'Computer Science and Business Systems',
-    'CD': 'Computer Science and Design',
-    'CG': 'Computer Science and Engineering (AI and ML)',
-    'CO': 'Computer Science and Engineering (IoT)',
-    'CN': 'Computer Science and Engineering (Networks)',
-    'CR': 'Computer Science and Engineering (Cyber Security)',
-    'CW': 'Computer Science and Engineering (Data Science)',
-    'CY': 'Cyber Security',
-    'CZ': 'Computer Science and Engineering (Specialization)',
-    'SC': 'Computer Science and Engineering (Cyber Security)',
-    'AE': 'Aeronautical Engineering',
-    'AGE': 'Agricultural Engineering',
-    'AG': 'Agricultural Engineering',
-    'AI&DS': 'Artificial Intelligence and Data Science',
-    'APT': 'Apparel Technology',
-    'ARCH': 'Architecture',
-    'ASE': 'Aerospace Engineering',
-    'AU': 'Automobile Engineering',
-    'BME': 'Biomedical Engineering',
-    'BT': 'Biotechnology',
-    'CCE': 'Computer and Communication Engineering',
-    'CECE': 'Civil and Environmental Engineering',
-    'CHE': 'Chemical Engineering',
-    'CIVIL': 'Civil Engineering',
-    'CRT': 'Ceramic Technology',
-    'CSBS': 'Computer Science and Business Systems',
-    'CSE': 'Computer Science Engineering',
-    'CSE (AI&ML)': 'Computer Science Engineering (AI and ML)',
-    'CSE (BDA)': 'Computer Science Engineering (Big Data Analytics)',
-    'CSE (IOT&CS)': 'Computer Science Engineering (IoT and Cyber Security)',
-    'CST': 'Computer Science and Technology',
-    'CT': 'Chemical Technology',
-    'CYS': 'Cyber Security',
-    'ECE': 'Electronics and Communication Engineering',
-    'EEE': 'Electrical and Electronics Engineering',
-    'EIE': 'Electronics and Instrumentation Engineering',
-    'ENVE': 'Environmental Engineering',
-    'ETE': 'Electronics and Telecommunication Engineering',
-    'FASHT': 'Fashion Technology',
-    'FT': 'Food Technology',
-    'GI': 'Geo Informatics',
-    'HTT': 'Handloom and Textile Technology',
-    'IBT': 'Industrial Biotechnology',
-    'ICE': 'Instrumentation and Control Engineering',
-    'IE': 'Industrial Engineering',
-    'IEM': 'Industrial Engineering and Management',
-    'ISE': 'Information Science and Engineering',
-    'IT': 'Information Technology',
-    'LE': 'Leather Technology',
-    'MAE': 'Mechanical and Automation Engineering',
-    'MCT': 'Mechatronics Engineering',
-    'MDE': 'Manufacturing Design Engineering',
-    'ME': 'Mechanical Engineering',
-    'ME (MFG)': 'Mechanical Engineering (Manufacturing)',
-    'MFGE': 'Manufacturing Engineering',
-    'MI': 'Mining Engineering',
-    'MME': 'Metallurgical and Materials Engineering',
-    'MRE': 'Mechatronics and Robotics Engineering',
-    'MSE': 'Materials Science and Engineering',
-    'MT': 'Marine Technology',
-    'PCT': 'Petrochemical Technology',
-    'PE': 'Production Engineering',
-    'PET': 'Petroleum Engineering and Technology',
-    'PETRO': 'Petrochemical Engineering',
-    'PETROCHEMICAL E': 'Petrochemical Engineering',
-    'PHARMT': 'Pharmaceutical Technology',
-    'PH': 'Pharmaceutical Technology',
-    'PT': 'Polymer Technology',
-    'PP': 'Polymer and Plastics Technology',
-    'RA': 'Robotics and Automation',
-    'RM': 'Robotics and Automation',
-    'RPT': 'Rubber and Plastics Technology',
-    'RP': 'Rubber and Plastics Technology',
-    'TC': 'Textile Chemistry',
-    'TX': 'Textile Technology',
-    'TT': 'Textile Technology',
-  };
-
-  void _seedFallbackOptions() {
-    _courseOptions = List<String>.from(_fallbackCourses);
-    _courseDisplayToQuery = {
-      for (final course in _fallbackCourses) course: course,
-    };
-    _districtOptions = List<String>.from(_fallbackDistricts);
-  }
-
-  String _toFullCourseName(String rawCourse) {
-    final trimmed = rawCourse.trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-
-    final key = trimmed.toUpperCase();
-    final mapped = _courseCodeToFullName[key];
-    if (mapped != null) {
-      return mapped;
-    }
-
-    if (trimmed.length <= 3 && !trimmed.contains(' ')) {
-      return 'Specialization ($trimmed)';
-    }
-
-    return trimmed;
-  }
-
   @override
   void initState() {
     super.initState();
-    _seedFallbackOptions();
     _physicsController.addListener(_calculateCutoff);
     _chemistryController.addListener(_calculateCutoff);
     _mathsController.addListener(_calculateCutoff);
     _loadCourses();
-    _loadDistricts();
   }
 
   @override
@@ -261,29 +139,10 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     if (!mounted) return;
 
     final resolved = courses.isEmpty ? _fallbackCourses : courses;
-    final displayToQuery = <String, String>{};
-
-    for (final rawCourse in resolved) {
-      final display = _toFullCourseName(rawCourse);
-      if (display.isEmpty) {
-        continue;
-      }
-      displayToQuery.putIfAbsent(display, () => rawCourse.trim());
-    }
-
-    if (displayToQuery.isEmpty) {
-      for (final fallback in _fallbackCourses) {
-        displayToQuery[fallback] = fallback;
-      }
-    }
-
-    final displayOptions = displayToQuery.keys.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
     setState(() {
-      _courseDisplayToQuery = displayToQuery;
-      _courseOptions = displayOptions;
+      _courseOptions = resolved;
       _coursesLoading = false;
+      _loadedCoursesFromApi = courses.isNotEmpty;
       if (!_courseOptions.contains(_selectedInterest) &&
           _courseOptions.isNotEmpty) {
         _selectedInterest = _courseOptions.first;
@@ -291,101 +150,35 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
     });
   }
 
-  Future<void> _loadAvailableCoursesForCurrentInputs() async {
-    if (_selectedCategory.isEmpty || _cutoff <= 0) {
-      return;
+  String _interestForRecommendationQuery(String selectedCourse) {
+    if (_loadedCoursesFromApi) {
+      return selectedCourse;
     }
 
-    if (_coursesLoading) {
-      return;
+    final course = selectedCourse.toLowerCase();
+    if (course.contains('computer') ||
+        course.contains('software') ||
+        course.contains('information technology') ||
+        course == 'it') {
+      return 'Software';
     }
 
-    setState(() {
-      _coursesLoading = true;
-    });
-
-    final available = await _apiService.getAvailableCourses(
-      category: _selectedCategory,
-      cutoff: _cutoff,
-    );
-    if (!mounted) return;
-
-    if (available.isEmpty) {
-      setState(() {
-        _coursesLoading = false;
-      });
-      return;
+    if (course.contains('electronics') ||
+        course.contains('electrical') ||
+        course.contains('ece') ||
+        course.contains('eee')) {
+      return 'Electronics';
     }
 
-    final displayToQuery = <String, String>{};
-    for (final value in available) {
-      final raw = value.trim();
-      if (raw.isEmpty) {
-        continue;
-      }
-
-      final display = _toFullCourseName(raw);
-      if (display.isEmpty) {
-        continue;
-      }
-
-      displayToQuery.putIfAbsent(display, () => raw);
+    if (course.contains('mechanical')) {
+      return 'Mechanical';
     }
 
-    if (displayToQuery.isEmpty) {
-      setState(() {
-        _coursesLoading = false;
-      });
-      return;
-    }
-
-    final displayOptions = displayToQuery.keys.toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-    setState(() {
-      _courseDisplayToQuery = displayToQuery;
-      _courseOptions = displayOptions;
-      _coursesLoading = false;
-      if (!_courseOptions.contains(_selectedInterest) &&
-          _courseOptions.isNotEmpty) {
-        _selectedInterest = _courseOptions.first;
-      }
-    });
-  }
-
-  Future<void> _loadDistricts() async {
-    setState(() {
-      _districtsLoading = true;
-    });
-
-    final districts = await _apiService.getDistricts();
-    if (!mounted) return;
-
-    final normalized = districts
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-    final resolved =
-        normalized.isEmpty ? _fallbackDistricts : ['Any', ...normalized];
-
-    setState(() {
-      _districtOptions = resolved;
-      _districtsLoading = false;
-      if (!_districtOptions.contains(_selectedDistrict)) {
-        _selectedDistrict = _districtOptions.first;
-      }
-    });
+    return 'Software';
   }
 
   void _nextPage() async {
     if (_currentStep < 2) {
-      if (_currentStep == 1) {
-        _loadAvailableCoursesForCurrentInputs();
-      }
-
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -410,59 +203,52 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
       return;
     }
 
-    if (!mounted) return;
+    List<Recommendation> prefetchedRecommendations = const [];
+    String? prefetchError;
 
-    final selectedCoursesForResults = <String>[_selectedInterest];
-    final interestQuery =
-        _courseDisplayToQuery[_selectedInterest] ?? _selectedInterest;
+    final recommendationCutoff = _cutoff > 100 ? _cutoff / 2 : _cutoff;
+    final districtQuery =
+        (_selectedDistrict == null || _selectedDistrict == 'Any')
+            ? null
+            : _selectedDistrict;
+
     try {
-      final String? effectiveDistrict =
-          _selectedDistrict == 'Any' ? null : _selectedDistrict;
-      List<Recommendation> recommendations =
-          await _apiService.getRecommendations(
+      final interestForQuery =
+          _interestForRecommendationQuery(_selectedInterest);
+      prefetchedRecommendations = await _apiService.getRecommendations(
         category: _selectedCategory,
-        cutoff: _cutoff,
-        interest: interestQuery,
-        district: effectiveDistrict,
+        cutoff: recommendationCutoff,
+        interest: interestForQuery,
+        district: districtQuery,
+        size: 30,
       );
-
-      if (!mounted) return;
-
-      if (recommendations.isEmpty) {
-        final districtLabel = effectiveDistrict ?? 'all districts';
-        _showSnackBar(
-          'No exact $_selectedInterest seats found for $districtLabel at cutoff ${_cutoff.toStringAsFixed(1)}. Try Software/IT or another category.',
-        );
-      }
-
-      Navigator.pushNamed(context, AppRoutes.analysisResults, arguments: {
-        'name': _nameController.text.trim().isEmpty
-            ? 'Student'
-            : _nameController.text.trim(),
-        'category': _selectedCategory,
-        'cutoff': _cutoff,
-        'selectedCourses': selectedCoursesForResults,
-        'interest': interestQuery,
-        'district': effectiveDistrict,
-        'prefetchedRecommendations': recommendations,
-      });
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to fetch recommendations')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    } catch (e) {
+      prefetchError = e.toString().replaceFirst('Exception: ', '');
     }
-  }
 
-  void _showSnackBar(String message) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+
+    final selectedCoursesForResults = _selectedCourses.isEmpty
+        ? <String>[_selectedInterest]
+        : List<String>.from(_selectedCourses);
+
+    Navigator.pushNamed(context, AppRoutes.analysisResults, arguments: {
+      'name': _nameController.text.trim().isEmpty
+          ? 'Student'
+          : _nameController.text.trim(),
+      'category': _selectedCategory,
+      'cutoff': _cutoff,
+      'selectedCourses': selectedCoursesForResults,
+      'selectedColleges': List<String>.from(_selectedColleges),
+      'interest': _selectedInterest,
+      'district': _selectedDistrict == 'Any' ? null : _selectedDistrict,
+      'prefetchedRecommendations': prefetchedRecommendations,
+      'prefetchError': prefetchError,
+    });
   }
 
   void _previousPage() {
@@ -737,6 +523,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
               child: LinearProgressIndicator(minHeight: 3),
             ),
           _buildSingleSelectDropdown(
+            label: "Course",
             options: _courseOptions.isEmpty ? _fallbackCourses : _courseOptions,
             selectedItem: _selectedInterest,
             onChanged: (val) => setState(() => _selectedInterest = val),
@@ -751,7 +538,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Districts are loaded from live backend data.',
+            'Using local district list for faster loading. Default district: Chennai.',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade600,
@@ -759,17 +546,32 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_districtsLoading)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 10),
-              child: LinearProgressIndicator(minHeight: 3),
-            ),
           _buildSingleSelectDropdown(
-            options: _districtOptions.isEmpty
-                ? _fallbackDistricts
-                : _districtOptions,
-            selectedItem: _selectedDistrict,
+            label: "District",
+            options: _districts,
+            selectedItem: _selectedDistrict ?? 'Chennai',
             onChanged: (val) => setState(() => _selectedDistrict = val),
+          ),
+          const SizedBox(height: 32),
+          const Text(
+            "College Preference",
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF374151)),
+          ),
+          const SizedBox(height: 12),
+          _MultiSelectDropdown(
+            label: 'Colleges',
+            options: _collegeOptions,
+            selectedItems: _selectedColleges,
+            onChanged: (selected) {
+              setState(() {
+                _selectedColleges
+                  ..clear()
+                  ..addAll(selected);
+              });
+            },
           ),
         ],
       ),
@@ -866,7 +668,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2))
                 : Text(
-                    _currentStep < 2 ? "Next →" : "Search Colleges",
+                    _currentStep < 2 ? "Next →" : "Start Analysis 🚀",
                     style: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold),
                   ),
@@ -877,6 +679,7 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
   }
 
   Widget _buildSingleSelectDropdown({
+    required String label,
     required List<String> options,
     required String selectedItem,
     required Function(String) onChanged,
@@ -905,6 +708,249 @@ class _AnalysisTestPageState extends State<AnalysisTestPage> {
             if (val != null) onChanged(val);
           },
         ),
+      ),
+    );
+  }
+}
+
+class _MultiSelectDropdown extends StatefulWidget {
+  final String label;
+  final List<String> options;
+  final List<String> selectedItems;
+  final Function(List<String>) onChanged;
+
+  const _MultiSelectDropdown({
+    required this.label,
+    required this.options,
+    required this.selectedItems,
+    required this.onChanged,
+  });
+
+  @override
+  State<_MultiSelectDropdown> createState() => _MultiSelectDropdownState();
+}
+
+class _MultiSelectDropdownState extends State<_MultiSelectDropdown> {
+  void _showDropdown() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _DropdownPanel(
+        options: widget.options,
+        initialSelected: widget.selectedItems,
+        onChanged: (selected) {
+          widget.onChanged(selected);
+          setState(() {});
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _showDropdown,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: widget.selectedItems.isEmpty
+                  ? Text(
+                      "Select preferred ${widget.label.toLowerCase()}",
+                      style: const TextStyle(
+                          color: Color(0xFF9CA3AF), fontSize: 14),
+                    )
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: widget.selectedItems.map((item) {
+                        return Chip(
+                          label: Text(
+                            item,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF4F46E5)),
+                          ),
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          deleteIcon: const Icon(Icons.close_rounded,
+                              size: 14, color: Color(0xFF4F46E5)),
+                          onDeleted: () {
+                            setState(() {
+                              widget.selectedItems.remove(item);
+                              widget.onChanged(widget.selectedItems);
+                            });
+                          },
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide.none),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF6B7280)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DropdownPanel extends StatefulWidget {
+  final List<String> options;
+  final List<String> initialSelected;
+  final Function(List<String>) onChanged;
+
+  const _DropdownPanel({
+    required this.options,
+    required this.initialSelected,
+    required this.onChanged,
+  });
+
+  @override
+  State<_DropdownPanel> createState() => _DropdownPanelState();
+}
+
+class _DropdownPanelState extends State<_DropdownPanel> {
+  late List<String> _selectedItems;
+  late List<String> _filteredOptions;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedItems = List.from(widget.initialSelected);
+    _filteredOptions = widget.options;
+  }
+
+  void _filterOptions(String query) {
+    setState(() {
+      _filteredOptions = widget.options
+          .where((option) => option.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "Select Courses",
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF111827)),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            onChanged: _filterOptions,
+            decoration: InputDecoration(
+              hintText: "Search courses...",
+              prefixIcon:
+                  const Icon(Icons.search_rounded, color: Color(0xFF9CA3AF)),
+              filled: true,
+              fillColor: const Color(0xFFF9FAFB),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _filteredOptions.length,
+              itemBuilder: (context, index) {
+                final option = _filteredOptions[index];
+                final isSelected = _selectedItems.contains(option);
+                return CheckboxListTile(
+                  title: Text(
+                    option,
+                    style: TextStyle(
+                      color: isSelected
+                          ? const Color(0xFF4F46E5)
+                          : const Color(0xFF374151),
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  value: isSelected,
+                  activeColor: const Color(0xFF4F46E5),
+                  checkColor: Colors.white,
+                  onChanged: (checked) {
+                    setState(() {
+                      if (checked!) {
+                        _selectedItems.add(option);
+                      } else {
+                        _selectedItems.remove(option);
+                      }
+                      widget.onChanged(_selectedItems);
+                    });
+                  },
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                elevation: 0,
+              ),
+              child: const Text(
+                "Done",
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

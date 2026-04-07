@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:guidex/app_routes.dart';
-import 'package:guidex/services/auth/auth_scope.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,111 +11,17 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authController = AuthScope.controller;
   bool _isPasswordVisible = false;
-  String? _inlineError;
-
-  @override
-  void initState() {
-    super.initState();
-    _authController.addListener(_onAuthChanged);
-  }
-
-  void _onAuthChanged() {
-    if (mounted) {
-      setState(() {
-        _inlineError = _authController.errorMessage;
-      });
-    }
-  }
 
   @override
   void dispose() {
-    _authController.removeListener(_onAuthChanged);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _signInWithEmail() async {
-    final bool success = await _authController.signInWithEmail(
-      email: _emailController.text,
-      password: _passwordController.text,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (success) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.userCategory,
-        (route) => false,
-      );
-      return;
-    }
-
-    _showError(_authController.errorMessage ?? 'Login failed.');
-  }
-
-  Future<void> _signInWithGoogle() async {
-    final bool success = await _authController.signInWithGoogle();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (success) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.userCategory,
-        (route) => false,
-      );
-      return;
-    }
-
-    _showError(_authController.errorMessage ?? 'Google sign-in failed.');
-  }
-
-  Future<void> _signInWithApple() async {
-    final bool success = await _authController.signInWithApple();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (success) {
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.userCategory,
-        (route) => false,
-      );
-      return;
-    }
-
-    _showError(_authController.errorMessage ?? 'Apple sign-in failed.');
-  }
-
-  void _showError(String message) {
-    setState(() {
-      _inlineError = message;
-    });
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final bool isLoading = _authController.isLoading;
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -200,28 +105,16 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ),
-                            if (_inlineError != null)
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    _inlineError!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
                             const SizedBox(height: 32),
                             // Sign In Button
                             SizedBox(
                               width: double.infinity,
                               height: 56,
                               child: ElevatedButton(
-                                onPressed: isLoading ? null : _signInWithEmail,
+                                onPressed: () {
+                                  Navigator.pushNamed(
+                                      context, AppRoutes.userCategory);
+                                },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
                                       const Color.fromARGB(255, 94, 194, 237),
@@ -230,26 +123,14 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                   elevation: 0,
                                 ),
-                                child: isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.4,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            Colors.black87,
-                                          ),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Sign In',
-                                        style: TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                child: const Text(
+                                  'Sign In',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 40),
@@ -276,23 +157,14 @@ class _LoginPageState extends State<LoginPage> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                _buildSocialButton(
-                                  Icons.apple,
-                                  Colors.black,
-                                  onTap: isLoading ? null : _signInWithApple,
-                                ),
+                                _buildSocialButton(Icons.apple, Colors.black),
                                 const SizedBox(width: 20),
                                 _buildSocialButton(
-                                  Icons.g_mobiledata_rounded,
-                                  Colors.red,
-                                  isGoogle: true,
-                                  onTap: isLoading ? null : _signInWithGoogle,
-                                ),
+                                    Icons.g_mobiledata_rounded, Colors.red,
+                                    isGoogle: true),
                                 const SizedBox(width: 20),
                                 _buildSocialButton(
-                                  Icons.facebook,
-                                  Colors.blue[800]!,
-                                ),
+                                    Icons.facebook, Colors.blue[800]!),
                               ],
                             ),
                             const SizedBox(height: 48),
@@ -386,7 +258,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildSocialButton(IconData icon, Color color,
-      {bool isGoogle = false, VoidCallback? onTap}) {
+      {bool isGoogle = false}) {
     return Container(
       width: 50,
       height: 50,
@@ -395,18 +267,11 @@ class _LoginPageState extends State<LoginPage> {
         border: Border.all(color: Colors.grey[200]!),
         color: Colors.white,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: Center(
-            child: Icon(
-              icon,
-              color: color,
-              size: isGoogle ? 40 : 24,
-            ),
-          ),
+      child: Center(
+        child: Icon(
+          icon,
+          color: color,
+          size: isGoogle ? 40 : 24,
         ),
       ),
     );

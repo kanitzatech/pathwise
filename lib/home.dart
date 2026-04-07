@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:guidex/app_routes.dart';
-import 'package:guidex/models/student_profile.dart';
 import 'package:guidex/services/api_service.dart';
-import 'package:guidex/services/auth/auth_scope.dart';
 import 'package:guidex/models/recommendation.dart';
 
 class Home extends StatefulWidget {
@@ -14,7 +12,6 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   final ApiService _apiService = ApiService();
-  final _authController = AuthScope.controller;
   int _selectedIndex = 0;
   List<Recommendation> _recommendedColleges = [];
   bool _isRecommendationsLoading = true;
@@ -27,34 +24,7 @@ class _HomeState extends State<Home> {
   @override
   void initState() {
     super.initState();
-    _authController.addListener(_onAuthChanged);
     _loadRecommendations();
-  }
-
-  @override
-  void dispose() {
-    _authController.removeListener(_onAuthChanged);
-    super.dispose();
-  }
-
-  void _onAuthChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _logout() async {
-    await _authController.signOut();
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      AppRoutes.login,
-      (route) => false,
-    );
   }
 
   Future<void> _loadRecommendations() async {
@@ -127,37 +97,21 @@ class _HomeState extends State<Home> {
   }
 
   Widget _buildGreeting() {
-    final StudentProfile? user = _authController.currentUser;
-    final String firstName = (user?.name.trim().isNotEmpty ?? false)
-        ? user!.name.trim().split(' ').first
-        : 'Student';
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Good Morning, $firstName',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF111827),
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Ready to conquer your goals today?',
-              style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
-            ),
-          ],
+        Text(
+          'Good Morning, Nithish',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF111827),
+          ),
         ),
-        IconButton(
-          tooltip: 'Logout',
-          onPressed: _authController.isLoading ? null : _logout,
-          icon: const Icon(Icons.logout_rounded),
-          color: const Color(0xFF111827),
+        SizedBox(height: 4),
+        Text(
+          'Ready to conquer your goals today?',
+          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
         ),
       ],
     );
