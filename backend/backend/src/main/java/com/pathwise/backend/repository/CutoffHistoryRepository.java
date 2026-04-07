@@ -1,8 +1,7 @@
 package com.pathwise.backend.repository;
 
 import com.pathwise.backend.model.CutoffHistory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.pathwise.backend.model.CutoffHistoryId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,40 +10,89 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface CutoffHistoryRepository extends JpaRepository<CutoffHistory, Integer> {
+public interface CutoffHistoryRepository extends JpaRepository<CutoffHistory, CutoffHistoryId> {
 
-    /**
-     * Finds cutoff records where:
-     *   - category matches (case-insensitive)
-     *   - closing_cutoff <= the student's cutoff mark
-     *   - closing_cutoff >= lowerBound (avoids suggesting extremely low tiered colleges)
-     *   - course_name is in the given list of mapped courses
-     *
-     * Results are eagerly joined with College and Course to avoid N+1 and sorted automatically via DB.
-     */
-    @Query(value = "SELECT ch.* FROM cutoff_history ch " +
-           "JOIN colleges c ON ch.college_id = c.college_id " +
-           "JOIN courses cr ON ch.course_id = cr.course_id " +
-           "WHERE (LOWER(ch.category) = LOWER(:category)) " +
-           "AND (ch.closing_cutoff <= :normalizedCutoff) " +
-           "AND (ch.closing_cutoff >= :lowerBound) " +
-           "AND (cr.course_name ILIKE ANY (CAST(:courseNames AS text[]))) " +
-           "AND (:district IS NULL OR :district = '' OR c.district ILIKE '%' || :district || '%')",
-           countQuery = "SELECT COUNT(*) FROM cutoff_history ch " +
-           "JOIN colleges c ON ch.college_id = c.college_id " +
-           "JOIN courses cr ON ch.course_id = cr.course_id " +
-           "WHERE (LOWER(ch.category) = LOWER(:category)) " +
-           "AND (ch.closing_cutoff <= :normalizedCutoff) " +
-           "AND (ch.closing_cutoff >= :lowerBound) " +
-           "AND (cr.course_name ILIKE ANY (CAST(:courseNames AS text[]))) " +
-           "AND (:district IS NULL OR :district = '' OR c.district ILIKE '%' || :district || '%')",
+          @Query(value = "SELECT * " +
+           "FROM cutoff_history ch " +
+              "WHERE ((:category = 'OC' AND ch.oc_min <= :cutoff) " +
+              "OR (:category = 'BC' AND ch.bc_min <= :cutoff) " +
+              "OR (:category = 'BCM' AND ch.bcm_min <= :cutoff) " +
+              "OR (:category = 'MBC' AND ch.mbc_min <= :cutoff) " +
+              "OR (:category = 'SC' AND ch.sc_min <= :cutoff) " +
+              "OR (:category = 'SCA' AND ch.sca_min <= :cutoff) " +
+              "OR (:category = 'ST' AND ch.st_min <= :cutoff)) " +
+              "ORDER BY CASE " +
+              "WHEN :category = 'OC' THEN ch.oc_min " +
+              "WHEN :category = 'BC' THEN ch.bc_min " +
+              "WHEN :category = 'BCM' THEN ch.bcm_min " +
+              "WHEN :category = 'MBC' THEN ch.mbc_min " +
+              "WHEN :category = 'SC' THEN ch.sc_min " +
+              "WHEN :category = 'SCA' THEN ch.sca_min " +
+              "WHEN :category = 'ST' THEN ch.st_min " +
+           "END DESC",
            nativeQuery = true)
-    Page<CutoffHistory> findRecommendations(
-            @Param("category") String category,
-            @Param("normalizedCutoff") Double normalizedCutoff,
-            @Param("lowerBound") Double lowerBound,
-            @Param("courseNames") String[] courseNames,
-            @Param("district") String district,
-            Pageable pageable
+    List<CutoffHistory> findRecommendationsByCategoryAndCutoff(
+        @Param("category") String category,
+        @Param("cutoff") Double cutoff
     );
+
+    @Query(value = "SELECT DISTINCT ch.branch " +
+            "FROM cutoff_history ch " +
+            "WHERE ((:category = 'OC' AND ch.oc_min <= :cutoff) " +
+            "OR (:category = 'BC' AND ch.bc_min <= :cutoff) " +
+            "OR (:category = 'BCM' AND ch.bcm_min <= :cutoff) " +
+            "OR (:category = 'MBC' AND ch.mbc_min <= :cutoff) " +
+            "OR (:category = 'SC' AND ch.sc_min <= :cutoff) " +
+            "OR (:category = 'SCA' AND ch.sca_min <= :cutoff) " +
+            "OR (:category = 'ST' AND ch.st_min <= :cutoff)) " +
+            "ORDER BY ch.branch",
+            nativeQuery = true)
+    List<String> findAvailableBranchesByCategoryAndCutoff(
+            @Param("category") String category,
+            @Param("cutoff") Double cutoff
+    );
+
+        @Query(value = "SELECT * " +
+                "FROM cutoff_history ch " +
+                "WHERE LOWER(TRIM(ch.branch)) = LOWER(TRIM(:courseName)) " +
+                "AND (CASE " +
+                "  WHEN :category = 'OC' THEN ch.oc_min " +
+                "  WHEN :category = 'BC' THEN ch.bc_min " +
+                "  WHEN :category = 'BCM' THEN ch.bcm_min " +
+                "  WHEN :category = 'MBC' THEN ch.mbc_min " +
+                "  WHEN :category = 'SC' THEN ch.sc_min " +
+                "  WHEN :category = 'SCA' THEN ch.sca_min " +
+                "  WHEN :category = 'ST' THEN ch.st_min " +
+                "END) IS NOT NULL " +
+                "AND (CASE " +
+                "  WHEN :category = 'OC' THEN ch.oc_min " +
+                "  WHEN :category = 'BC' THEN ch.bc_min " +
+                "  WHEN :category = 'BCM' THEN ch.bcm_min " +
+                "  WHEN :category = 'MBC' THEN ch.mbc_min " +
+                "  WHEN :category = 'SC' THEN ch.sc_min " +
+                "  WHEN :category = 'SCA' THEN ch.sca_min " +
+                "  WHEN :category = 'ST' THEN ch.st_min " +
+                "END) <= :maxEligibleCutoff " +
+                "ORDER BY " +
+                "CASE " +
+                "  WHEN LOWER(ch.college_name) LIKE '%anna university%' OR LOWER(ch.college_name) LIKE '%ceg%' OR LOWER(ch.college_name) LIKE '%mit campus%' OR LOWER(ch.college_name) LIKE '%act campus%' THEN 1 " +
+                "  WHEN LOWER(ch.college_name) LIKE '%ssn%' OR LOWER(ch.college_name) LIKE '%psg%' OR LOWER(ch.college_name) LIKE '%coimbatore institute of technology%' OR LOWER(ch.college_name) LIKE '%cit%' OR LOWER(ch.college_name) LIKE '%srm institute of science and technology%' OR LOWER(ch.college_name) LIKE '%srm university kattankulathur%' THEN 1 " +
+                "  WHEN LOWER(ch.college_name) LIKE '%autonomous%' THEN 2 " +
+                "  ELSE 3 " +
+                "END ASC, " +
+                "(CASE " +
+                "  WHEN :category = 'OC' THEN ch.oc_min " +
+                "  WHEN :category = 'BC' THEN ch.bc_min " +
+                "  WHEN :category = 'BCM' THEN ch.bcm_min " +
+                "  WHEN :category = 'MBC' THEN ch.mbc_min " +
+                "  WHEN :category = 'SC' THEN ch.sc_min " +
+                "  WHEN :category = 'SCA' THEN ch.sca_min " +
+                "  WHEN :category = 'ST' THEN ch.st_min " +
+                "END) DESC, ch.college_name ASC",
+                nativeQuery = true)
+        List<CutoffHistory> findRankedRecommendationsByCategoryCourseAndCutoff(
+                @Param("category") String category,
+                @Param("courseName") String courseName,
+                @Param("maxEligibleCutoff") Double maxEligibleCutoff
+        );
 }

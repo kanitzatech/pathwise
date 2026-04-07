@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:guidex/app_routes.dart';
+import 'package:guidex/services/auth/auth_scope.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -34,11 +35,20 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
 
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
-      }
-    });
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final bool hasSession = await AuthScope.controller.restoreSession();
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pushReplacementNamed(
+      hasSession ? AppRoutes.home : AppRoutes.onboarding,
+    );
   }
 
   @override
