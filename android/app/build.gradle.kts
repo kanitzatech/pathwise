@@ -9,7 +9,8 @@ plugins {
 android {
     namespace = "com.example.guidex"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion disabled - pure Dart/Flutter app, no C++ needed
+    // ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
