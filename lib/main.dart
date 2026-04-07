@@ -1,4 +1,3 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:guidex/app_routes.dart';
 import 'package:guidex/onboardingscreen.dart';
@@ -11,9 +10,7 @@ import 'package:guidex/screens/analysis_test_page.dart';
 import 'package:guidex/screens/analysis_results_page.dart';
 import 'package:guidex/models/recommendation.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+void main() {
   runApp(const MyApp());
 }
 
